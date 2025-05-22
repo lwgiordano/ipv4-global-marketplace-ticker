@@ -1,0 +1,8 @@
+IPv4.Global Ticker Options
+Excluded Domains:
+The banner will not appear on these domains or their subdomains.
+Filter by Block Size (Prefix Length):
+                All Sizes
+                
+Select a specific IP block size to filter listings and sales.
+
