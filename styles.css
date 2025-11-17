@@ -15,8 +15,8 @@
   font-size: 12px !important;
   border-radius: 4px !important;
   opacity: 0.95 !important;
-  overflow-x: hidden !important; /* Hide horizontal overflow (ticker text) */
-  overflow-y: visible !important; /* Allow vertical overflow (dropdown menu) */
+  /* IMPORTANT: no scrollbars from the banner itself */
+  overflow: hidden !important;
   margin: 0 !important;
   border: none !important;
   outline: none !important;
@@ -149,16 +149,16 @@
 
 /* Submenu for Gear Icon */
 #ipv4-gear-submenu {
-  position: absolute;
-  right: 5px; 
-  background-color: white;
-  border: 1px solid #ccc;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.15);
-  z-index: 2147483647; 
-  border-radius: 3px;
-  padding: 5px 0;
-  min-width: 100px; 
-  display: none; 
+  /* Free-floating overlay, not clipped by the banner */
+  position: fixed !important;
+  background-color: white !important;
+  border: 1px solid #ccc !important;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.15) !important;
+  z-index: 2147483647 !important;
+  border-radius: 3px !important;
+  padding: 5px 0 !important;
+  min-width: 120px !important;
+  display: none !important;
 }
 
 #ipv4-gear-submenu div {
