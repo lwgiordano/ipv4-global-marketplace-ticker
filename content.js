@@ -329,7 +329,7 @@
 
     // 1) Minimize / Expand
     const toggleItem = document.createElement('div');
-    toggleItem.textContent = isMinimized ? 'Expand ticker' : 'Minimize ticker';
+    toggleItem.textContent = isMinimized ? 'Expand' : 'Minimize';
     toggleItem.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -347,14 +347,18 @@
     optionsItem.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      try {
-        if (chrome && chrome.runtime && chrome.runtime.openOptionsPage) {
-          chrome.runtime.openOptionsPage();
-        }
-      } catch (err) {
-        log.warn('[IPv4 Banner] Error opening options from menu:', err);
-      }
       toggleGearSubmenu(false);
+
+      // Open options page
+      if (isChromeAvailable()) {
+        try {
+          chrome.runtime.openOptionsPage();
+        } catch (err) {
+          log.error('[IPv4 Banner] Error opening options page:', err);
+        }
+      } else {
+        log.warn('[IPv4 Banner] Chrome API not available, cannot open options page');
+      }
     });
     submenu.appendChild(optionsItem);
   }
