@@ -30,9 +30,9 @@
 
 /* Styles for when the banner is minimized */
 .ipv4-banner-minimized {
-  width: auto !important;
-  max-width: max-content !important;
-  min-width: min-content !important;
+  /* Let JS control the width via inline styles */
+  /* Safety: never exceed viewport width */
+  max-width: 100vw;
 }
 
 /* Utility class to hide elements - Scoped to #ipv4-banner */
