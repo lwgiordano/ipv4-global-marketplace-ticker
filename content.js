@@ -1,6 +1,6 @@
-// content.js (v33.3 - Fix for getValidPriceString and other regressions)
-(async function() { 
-  console.log('[IPv4 Banner] content.js script executing (v33.3)...');
+// content.js (v33.4 - Fix minimize animation and options link)
+(async function() {
+  console.log('[IPv4 Banner] content.js script executing (v33.4)...');
 
   const CONFIG = {
     refreshInterval: 60000,
@@ -319,33 +319,40 @@
     optionsItem.textContent = 'Options';
     optionsItem.onclick = (e) => {
         e.stopPropagation();
-        if (isChromeAvailable() && chrome.runtime && typeof chrome.runtime.openOptionsPage === 'function') {
-            log.info("Attempting to open options page via chrome.runtime.openOptionsPage().");
-            chrome.runtime.openOptionsPage(err => { 
+        if (isChromeAvailable()) {
+            log.info("Requesting background script to open options page.");
+            chrome.runtime.sendMessage({ type: 'openOptions' }, (response) => {
                 if (chrome.runtime.lastError) {
-                    log.warn("Failed to open options page via API:", chrome.runtime.lastError.message, "Trying fallback.");
+                    log.warn("Runtime error when opening options:", chrome.runtime.lastError.message);
+                    // Fallback: try to open options.html directly
                     try {
                         const optionsUrl = chrome.runtime.getURL('options.html');
                         window.open(optionsUrl, '_blank');
+                        log.info("Opened options page via direct URL fallback.");
                     } catch (urlError) {
-                        log.error("Failed to get options.html URL for fallback:", urlError);
-                         alert("Could not open options page. Please check extension permissions or manifest.");
+                        log.error("Failed to open options page with fallback:", urlError);
+                        alert("Could not open options page. Please try right-clicking the extension icon and selecting 'Options'.");
+                    }
+                } else if (response && !response.success) {
+                    log.warn("Background script could not open options page:", response.error);
+                    // Fallback: try to open options.html directly
+                    try {
+                        const optionsUrl = chrome.runtime.getURL('options.html');
+                        window.open(optionsUrl, '_blank');
+                        log.info("Opened options page via direct URL fallback.");
+                    } catch (urlError) {
+                        log.error("Failed to open options page with fallback:", urlError);
+                        alert("Could not open options page. Please try right-clicking the extension icon and selecting 'Options'.");
                     }
                 } else {
-                    log.info("Options page opened (or attempt made) successfully via API.");
+                    log.info("Options page opened successfully.");
                 }
             });
         } else {
-            log.warn("chrome.runtime.openOptionsPage API not available or runtime not defined, trying direct URL.");
-            try {
-                const optionsUrl = chrome.runtime.getURL('options.html');
-                window.open(optionsUrl, '_blank');
-            } catch (urlError) {
-                log.error("Failed to get options.html URL:", urlError);
-                alert("Could not open options page. Extension APIs not fully available.");
-            }
+            log.error("Chrome runtime not available, cannot open options page.");
+            alert("Extension functionality not available. Please reload the page.");
         }
-        if (isGearSubmenuOpen) toggleGearSubmenu(); 
+        if (isGearSubmenuOpen) toggleGearSubmenu();
     };
     submenu.appendChild(optionsItem);
 
@@ -400,12 +407,14 @@
         if (titleEl) titleEl.classList.remove('ipv4-element-hidden'); 
         if (scrollContainer) scrollContainer.classList.remove('ipv4-element-hidden'); 
         
-        let currentMinimizedWidth = banner.offsetWidth; 
-        if (currentMinimizedWidth < CONFIG.minWidth / 3 || currentMinimizedWidth > CONFIG.minWidth ) { 
-            const dragHandleWidth = document.getElementById('ipv4-drag-handle')?.offsetWidth || 16; 
-            const logoLinkWidth = document.getElementById('ipv4-logo-link')?.offsetWidth || CONFIG.minIconSize + 4;
-            const gearBtnWidth = document.getElementById('ipv4-gear-button')?.offsetWidth || 24; 
-            currentMinimizedWidth = dragHandleWidth + logoLinkWidth + gearBtnWidth + (CONFIG.minimizedSpacing * 2) + CONFIG.normalSpacing + 8;
+        let currentMinimizedWidth = banner.offsetWidth;
+        if (currentMinimizedWidth < CONFIG.minWidth / 3 || currentMinimizedWidth > CONFIG.minWidth ) {
+            const dragHandleWidth = document.getElementById('ipv4-drag-handle')?.offsetWidth || 16;
+            const logoLinkWidth = document.getElementById('ipv4-logo-link')?.offsetWidth || CONFIG.minIconSize;
+            const gearBtnWidth = document.getElementById('ipv4-gear-button')?.offsetWidth || 24;
+            // Account for: banner padding (8px left + 8px right), drag handle margin-right (6px),
+            // logo margin-right (4px), gear button margin-left (6px)
+            currentMinimizedWidth = dragHandleWidth + logoLinkWidth + gearBtnWidth + 16 + 6 + 4 + 6;
         }
         banner.style.width = currentMinimizedWidth + 'px'; 
         log.info("Start expand animation from width:", currentMinimizedWidth); 
@@ -438,10 +447,12 @@
         banner.offsetHeight; 
         banner.style.transition = 'width ' + CONFIG.minimizeAnimationDuration + 'ms ease-in'; 
         
-        const dhw = document.getElementById('ipv4-drag-handle')?.offsetWidth || 16; 
-        const llw = document.getElementById('ipv4-logo-link')?.offsetWidth || CONFIG.minIconSize; 
-        const gbW = document.getElementById('ipv4-gear-button')?.offsetWidth || 24; 
-        const amcw = dhw + llw + gbW + (CONFIG.minimizedSpacing * 2) + (CONFIG.normalSpacing) ; 
+        const dhw = document.getElementById('ipv4-drag-handle')?.offsetWidth || 16;
+        const llw = document.getElementById('ipv4-logo-link')?.offsetWidth || CONFIG.minIconSize;
+        const gbW = document.getElementById('ipv4-gear-button')?.offsetWidth || 24;
+        // Account for: banner padding (8px left + 8px right), drag handle margin-right (6px),
+        // logo margin-right (4px), gear button margin-left (6px)
+        const amcw = dhw + llw + gbW + 16 + 6 + 4 + 6; 
         
         banner.style.width = amcw + 'px'; 
         log.info("Minimizing: animating to width approx:", amcw); 

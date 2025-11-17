@@ -24,8 +24,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     .catch(error => {
       console.error('Error fetching data:', error);
       // Send a more detailed error message
-      sendResponse({ 
-        success: false, 
+      sendResponse({
+        success: false,
         error: error.toString(),
         details: {
           message: error.message,
@@ -33,8 +33,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
       });
     });
-    
+
     // Return true to indicate we'll respond asynchronously
+    return true;
+  }
+
+  // Handle opening the options page
+  if (request.type === 'openOptions') {
+    try {
+      if (chrome.runtime.openOptionsPage) {
+        chrome.runtime.openOptionsPage(() => {
+          if (chrome.runtime.lastError) {
+            console.warn('Error opening options page:', chrome.runtime.lastError.message);
+            sendResponse({ success: false, error: chrome.runtime.lastError.message });
+          } else {
+            sendResponse({ success: true });
+          }
+        });
+      } else {
+        sendResponse({ success: false, error: 'openOptionsPage not available' });
+      }
+    } catch (error) {
+      console.error('Error opening options page:', error);
+      sendResponse({ success: false, error: error.toString() });
+    }
     return true;
   }
 });
