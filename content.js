@@ -319,33 +319,19 @@
     optionsItem.textContent = 'Options';
     optionsItem.onclick = (e) => {
         e.stopPropagation();
-        if (isChromeAvailable() && chrome.runtime && typeof chrome.runtime.openOptionsPage === 'function') {
-            log.info("Attempting to open options page via chrome.runtime.openOptionsPage().");
-            chrome.runtime.openOptionsPage(err => { 
+        if (isChromeAvailable()) {
+            log.info("Sending 'openOptions' message to background script.");
+            chrome.runtime.sendMessage({ type: 'openOptions' }, (response) => {
                 if (chrome.runtime.lastError) {
-                    log.warn("Failed to open options page via API:", chrome.runtime.lastError.message, "Trying fallback.");
-                    try {
-                        const optionsUrl = chrome.runtime.getURL('options.html');
-                        window.open(optionsUrl, '_blank');
-                    } catch (urlError) {
-                        log.error("Failed to get options.html URL for fallback:", urlError);
-                         alert("Could not open options page. Please check extension permissions or manifest.");
-                    }
+                    log.warn('[IPv4 Banner] openOptions error:', chrome.runtime.lastError.message);
                 } else {
-                    log.info("Options page opened (or attempt made) successfully via API.");
+                    log.info('[IPv4 Banner] openOptions response:', response);
                 }
             });
         } else {
-            log.warn("chrome.runtime.openOptionsPage API not available or runtime not defined, trying direct URL.");
-            try {
-                const optionsUrl = chrome.runtime.getURL('options.html');
-                window.open(optionsUrl, '_blank');
-            } catch (urlError) {
-                log.error("Failed to get options.html URL:", urlError);
-                alert("Could not open options page. Extension APIs not fully available.");
-            }
+            log.warn("Chrome runtime not available for opening options.");
         }
-        if (isGearSubmenuOpen) toggleGearSubmenu(); 
+        if (isGearSubmenuOpen) toggleGearSubmenu();
     };
     submenu.appendChild(optionsItem);
 

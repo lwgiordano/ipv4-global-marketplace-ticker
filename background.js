@@ -1,5 +1,20 @@
 // Enhanced background service worker with better error handling
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type === 'openOptions') {
+    console.log('[IPv4 BG] Received openOptions request');
+    chrome.runtime.openOptionsPage(() => {
+      if (chrome.runtime.lastError) {
+        console.error('[IPv4 BG] openOptionsPage failed:', chrome.runtime.lastError.message);
+        sendResponse({ ok: false, error: chrome.runtime.lastError.message });
+      } else {
+        console.log('[IPv4 BG] openOptionsPage succeeded');
+        sendResponse({ ok: true });
+      }
+    });
+    // Return true to indicate we'll respond asynchronously
+    return true;
+  }
+
   if (request.type === 'fetchData' && request.url) {
     // Make the network request from the background service worker
     fetch(request.url, {
