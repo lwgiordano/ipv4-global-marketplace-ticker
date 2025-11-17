@@ -1,6 +1,6 @@
-// content.js (v33.3 - Fix for getValidPriceString and other regressions)
-(async function() { 
-  console.log('[IPv4 Banner] content.js script executing (v33.3)...');
+// content.js (v33.4 - Fix for options link blocking and minimize animation overflow)
+(async function() {
+  console.log('[IPv4 Banner] content.js script executing (v33.4)...');
 
   const CONFIG = {
     refreshInterval: 60000,
@@ -321,12 +321,17 @@
         e.stopPropagation();
         if (isChromeAvailable() && chrome.runtime && typeof chrome.runtime.openOptionsPage === 'function') {
             log.info("Attempting to open options page via chrome.runtime.openOptionsPage().");
-            chrome.runtime.openOptionsPage(err => { 
+            chrome.runtime.openOptionsPage(err => {
                 if (chrome.runtime.lastError) {
                     log.warn("Failed to open options page via API:", chrome.runtime.lastError.message, "Trying fallback.");
                     try {
                         const optionsUrl = chrome.runtime.getURL('options.html');
-                        window.open(optionsUrl, '_blank');
+                        if (chrome.tabs && typeof chrome.tabs.create === 'function') {
+                            chrome.tabs.create({ url: optionsUrl });
+                        } else {
+                            log.error("chrome.tabs.create not available for fallback.");
+                            alert("Could not open options page. Please check extension permissions or manifest.");
+                        }
                     } catch (urlError) {
                         log.error("Failed to get options.html URL for fallback:", urlError);
                          alert("Could not open options page. Please check extension permissions or manifest.");
@@ -339,13 +344,18 @@
             log.warn("chrome.runtime.openOptionsPage API not available or runtime not defined, trying direct URL.");
             try {
                 const optionsUrl = chrome.runtime.getURL('options.html');
-                window.open(optionsUrl, '_blank');
+                if (chrome.tabs && typeof chrome.tabs.create === 'function') {
+                    chrome.tabs.create({ url: optionsUrl });
+                } else {
+                    log.error("chrome.tabs.create not available.");
+                    alert("Could not open options page. Extension APIs not fully available.");
+                }
             } catch (urlError) {
                 log.error("Failed to get options.html URL:", urlError);
                 alert("Could not open options page. Extension APIs not fully available.");
             }
         }
-        if (isGearSubmenuOpen) toggleGearSubmenu(); 
+        if (isGearSubmenuOpen) toggleGearSubmenu();
     };
     submenu.appendChild(optionsItem);
 
@@ -426,31 +436,34 @@
             log.info("Fetching data on expand as hasFetchedData is false."); 
             setTimeout(fetchData, 50); 
         } else {log.info("Already hasFetchedData, not fetching on expand.");} 
-    } else { 
-        log.info("Minimizing banner"); 
-        const cw = banner.offsetWidth; 
-        if (cw >= CONFIG.minWidth && oldIsMinimized === false) { 
-            preMinimizeWidth = cw; 
-            preMinimizeWidthPercent = calculateWidthPercentage(cw); 
-            saveWidth(cw); 
-        } 
-        banner.style.width = cw + 'px'; 
-        banner.offsetHeight; 
-        banner.style.transition = 'width ' + CONFIG.minimizeAnimationDuration + 'ms ease-in'; 
-        
-        const dhw = document.getElementById('ipv4-drag-handle')?.offsetWidth || 16; 
-        const llw = document.getElementById('ipv4-logo-link')?.offsetWidth || CONFIG.minIconSize; 
-        const gbW = document.getElementById('ipv4-gear-button')?.offsetWidth || 24; 
-        const amcw = dhw + llw + gbW + (CONFIG.minimizedSpacing * 2) + (CONFIG.normalSpacing) ; 
-        
-        banner.style.width = amcw + 'px'; 
-        log.info("Minimizing: animating to width approx:", amcw); 
-        setTimeout(() => { 
-            banner.classList.add('ipv4-banner-minimized'); 
-            if (titleEl) titleEl.classList.add('ipv4-element-hidden'); 
-            if (scrollContainer) scrollContainer.classList.add('ipv4-element-hidden'); 
-            banner.style.width = ''; 
-        }, CONFIG.minimizeAnimationDuration); 
+    } else {
+        log.info("Minimizing banner");
+        const cw = banner.offsetWidth;
+        if (cw >= CONFIG.minWidth && oldIsMinimized === false) {
+            preMinimizeWidth = cw;
+            preMinimizeWidthPercent = calculateWidthPercentage(cw);
+            saveWidth(cw);
+        }
+
+        // Hide elements BEFORE starting animation to prevent overflow
+        if (titleEl) titleEl.classList.add('ipv4-element-hidden');
+        if (scrollContainer) scrollContainer.classList.add('ipv4-element-hidden');
+
+        banner.style.width = cw + 'px';
+        banner.offsetHeight;
+        banner.style.transition = 'width ' + CONFIG.minimizeAnimationDuration + 'ms ease-in';
+
+        const dhw = document.getElementById('ipv4-drag-handle')?.offsetWidth || 16;
+        const llw = document.getElementById('ipv4-logo-link')?.offsetWidth || CONFIG.minIconSize;
+        const gbW = document.getElementById('ipv4-gear-button')?.offsetWidth || 24;
+        const amcw = dhw + llw + gbW + (CONFIG.minimizedSpacing * 2) + (CONFIG.normalSpacing) ;
+
+        banner.style.width = amcw + 'px';
+        log.info("Minimizing: animating to width approx:", amcw);
+        setTimeout(() => {
+            banner.classList.add('ipv4-banner-minimized');
+            banner.style.width = '';
+        }, CONFIG.minimizeAnimationDuration);
     } 
     setTimeout(() => { 
         if (banner) banner.style.transition = ''; 
