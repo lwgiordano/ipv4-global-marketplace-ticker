@@ -262,27 +262,46 @@
 
   function toggleGearSubmenu() {
     const submenu = document.getElementById('ipv4-gear-submenu');
-    const banner = document.getElementById('ipv4-banner');
-    if (!submenu || !banner) { log.warn("Submenu or banner not found in toggleGearSubmenu"); return; }
+    const gearButton = document.getElementById('ipv4-gear-button');
 
-    isGearSubmenuOpen = !isGearSubmenuOpen;
-    if (isGearSubmenuOpen) {
-        updateGearSubmenu(); 
-        submenu.style.display = 'block';
-        const bannerRect = banner.getBoundingClientRect();
-        const submenuHeight = submenu.offsetHeight;
-        if (bannerRect.top > submenuHeight + CONFIG.bannerHeight + 5) { 
-            submenu.style.bottom = `${CONFIG.bannerHeight + 2}px`; 
-            submenu.style.top = 'auto';
-        } else { 
-            submenu.style.top = `${CONFIG.bannerHeight + 2}px`; 
-            submenu.style.bottom = 'auto';
-        }
-        document.addEventListener('click', handleClickOutsideSubmenu, true);
-    } else {
-        submenu.style.display = 'none';
-        document.removeEventListener('click', handleClickOutsideSubmenu, true);
+    if (!submenu || !gearButton) {
+      log.warn("Submenu or gear button not found in toggleGearSubmenu");
+      return;
     }
+
+    // If it's open, close it and exit
+    if (isGearSubmenuOpen) {
+      submenu.style.display = 'none';
+      isGearSubmenuOpen = false;
+      document.removeEventListener('click', handleClickOutsideSubmenu, true);
+      return;
+    }
+
+    // Opening: populate and show
+    updateGearSubmenu();
+    submenu.style.display = 'block';
+
+    // Position submenu near the gear button (bottom-right aligned)
+    const gearRect = gearButton.getBoundingClientRect();
+    const submenuRect = submenu.getBoundingClientRect();
+
+    let top = gearRect.bottom + 4;
+    if (top + submenuRect.height > window.innerHeight - 4) {
+      // Not enough room below – open above
+      top = Math.max(4, gearRect.top - submenuRect.height - 4);
+    }
+
+    let left = gearRect.right - submenuRect.width;
+    if (left < 4) {
+      left = 4;
+    }
+
+    submenu.style.top = `${top}px`;
+    submenu.style.left = `${left}px`;
+    submenu.style.right = 'auto';
+
+    isGearSubmenuOpen = true;
+    document.addEventListener('click', handleClickOutsideSubmenu, true);
   }
   
   function handleClickOutsideSubmenu(event) {
@@ -540,8 +559,11 @@
       const llE = _createLogoLinkElement(); b.appendChild(llE);
       const tE = _createTitleElement(currentViewMode); b.appendChild(tE);
       const scE = _createScrollContainerElement(); b.appendChild(scE);
-      const gearBtnE = _createGearButtonElement(); b.appendChild(gearBtnE); 
-      const submenuE = _createGearSubmenuElement(); b.appendChild(submenuE); 
+      const gearBtnE = _createGearButtonElement(); b.appendChild(gearBtnE);
+
+      const submenuE = _createGearSubmenuElement();
+      // Attach submenu to the document body so it isn't clipped by the banner
+      document.body.appendChild(submenuE); 
 
 
       tE.classList.toggle('ipv4-element-hidden', isMinimized);
