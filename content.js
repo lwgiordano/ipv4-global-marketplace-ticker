@@ -317,8 +317,10 @@
     positionGearSubmenu();
     isGearSubmenuOpen = true;
 
-    // Close when clicking anywhere else
-    document.addEventListener('click', handleClickOutsideGearSubmenu, true);
+    // Close when clicking anywhere else (delayed to avoid immediate closure)
+    setTimeout(() => {
+      document.addEventListener('click', handleClickOutsideGearSubmenu, true);
+    }, 10);
   }
 
   function updateGearSubmenu() {
