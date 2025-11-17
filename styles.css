@@ -1,23 +1,31 @@
+/* styles.css (v33.3 - Corrected for Gear Menu & New Cursor Requests) */
 /* Base styles for the banner */
-
 .ipv4-banner-base {
-  position: fixed; /* Crucial for draggable banner */
-  z-index: 2147483647;
-  background-color: white;
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  background-color: white !important;
   box-shadow: rgba(0, 0, 0, 0.2) 0px 0px 8px 0px !important;
-  color: black;
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  padding: 4px 8px;
-  box-sizing: border-box;az
-  font-family: Arial, sans-serif;
-  font-size: 12px;
-  border-radius: 4px;
-  opacity: 0.95;
-  /* height is set by CONFIG.bannerHeight in JS */
-  /* width, top, left, right, bottom are set by JS */
-  overflow: hidden;
+  color: black !important;
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  padding: 4px 8px !important;
+  box-sizing: border-box !important;
+  font-family: Arial, sans-serif !important;
+  font-size: 12px !important;
+  border-radius: 4px !important;
+  opacity: 0.95 !important;
+  overflow: visible !important; /* Allow submenu to show */
+  margin: 0 !important;
+  border: none !important;
+  outline: none !important;
+  background-image: none !important;
+  text-decoration: none !important;
+  text-transform: none !important;
+  line-height: normal !important;
+  letter-spacing: normal !important;
+  word-spacing: normal !important;
+  text-shadow: none !important;
 }
 
 /* Styles for when the banner is minimized */
@@ -27,128 +35,173 @@
   min-width: min-content !important;
 }
 
-/* Utility class to hide elements */
-.ipv4-element-hidden {
+/* Utility class to hide elements - Scoped to #ipv4-banner */
+#ipv4-banner .ipv4-element-hidden {
   display: none !important;
 }
 
 /* Title element styling */
-.banner-title-style {
-  font-weight: bold;
-  font-family: sans-serif;
-  color: rgb(255, 255, 255);
-  background-color: #0062ff;
-  font-size: 12px;
-  padding: 2px 8px;
-  margin-left: 4px;
-  margin-right: 0;
-  white-space: nowrap;
-  flex-shrink: 0;
-  cursor: pointer;
-  /* line-height is set dynamically in JS */
+#ipv4-banner .banner-title-style {
+  font-weight: bold !important;
+  font-family: sans-serif !important;
+  color: rgb(255, 255, 255) !important;
+  background-color: #0062ff !important;
+  font-size: 12px !important;
+  padding: 2px 8px !important;
+  margin-left: 4px !important;
+  margin-right: 0 !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  cursor: pointer !important; 
 }
 
 /* Logo styling */
 #ipv4-logo-link {
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  margin-right: 4px;
-  flex-shrink: 0;
-  height: 100%;
+  text-decoration: none !important;
+  display: flex !important;
+  align-items: center !important;
+  margin-right: 4px !important;
+  flex-shrink: 0 !important;
+  height: 100% !important;
 }
 
 #ipv4-logo {
-  object-fit: contain;
-  display: block;
-  /* height and width are set dynamically in JS by updateLogo() */
+  object-fit: contain !important;
+  display: block !important;
 }
 
 /* Scrolling container */
 #ipv4-scroll-container {
-  position: relative;
-  flex: 1;
-  min-width: 50px;
-  height: 18px; /* Or make this dynamic based on bannerHeight - padding */
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  flex-shrink: 1;
+  position: relative !important;
+  flex: 1 !important;
+  min-width: 50px !important;
+  height: 18px !important;
+  overflow: hidden !important; 
+  display: flex !important;
+  align-items: center !important;
+  flex-shrink: 1 !important;
+  cursor: default !important; 
 }
 
-/* Scrolling content */
 #ipv4-scroll-content {
-  display: inline-block;
-  white-space: nowrap;
-  line-height: 18px;
-  font-size: 12px;
+  display: inline-block !important;
+  white-space: nowrap !important;
+  line-height: 18px !important;
+  font-size: 12px !important;
 }
 
 /* Styling for sale item parts (ticker text) */
-#ipv4-banner .prefix { /* Scoped to the banner */
-  color: #005398;
-  font-weight: bold;
+#ipv4-banner .prefix {
+  color: #005398 !important;
+  font-weight: bold !important;
 }
 #ipv4-banner .registry {
-  color: #0062ff;
-  font-weight: bold;
+  color: #0062ff !important;
+  font-weight: bold !important;
 }
 #ipv4-banner .price {
-  color: #13b5ea;
+  color: #13b5ea !important;
+  font-weight: bold !important;
+}
+
+/* Gear button styles (replaces #ipv4-toggle-button) */
+#ipv4-gear-button {
+  font-size: 18px !important; 
   font-weight: bold;
+  cursor: pointer !important; 
+  color: #555 !important; 
+  flex-shrink: 0 !important;
+  padding: 0px 5px !important; 
+  margin-left: 6px !important;
+  line-height: 1 !important; 
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  user-select: none; 
 }
-
-/* Options link style */
-#ipv4-options-link {
-  font-size: 11px;
-  cursor: pointer;
-  color: #0062ff;
-  text-decoration: none;
-  flex-shrink: 0;
-  font-family: Arial, sans-serif;
-  padding: 2px 6px;
-  margin-left: 6px;
-  white-space: nowrap;
-  border: 1px solid #0062ff;
-  border-radius: 3px;
-  background-color: transparent;
-  transition: background-color 0.2s, color 0.2s;
-}
-
-#ipv4-options-link:hover {
-  background-color: #0062ff;
-  color: white;
-}
-
-/* Toggle button style */
-#ipv4-toggle-button {
-  font-size: 10px;
-  cursor: pointer;
-  color: #999;
-  flex-shrink: 0;
-  font-family: Arial, "Courier New", monospace !important;
-  padding: 2px 4px;
-  /* margin-left is set dynamically in JS */
+#ipv4-gear-button:hover {
+  color: #000 !important;
 }
 
 /* Drag handle styles */
 #ipv4-drag-handle {
-  cursor: move;
-  width: 16px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  margin-right: 6px;
-  position: relative;
-  flex-shrink: 0;
+  cursor: move !important; 
+  width: 16px !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-right: 6px !important;
+  position: relative !important;
+  flex-shrink: 0 !important;
 }
 
 #ipv4-drag-handle > div {
-  width: 3px;
-  height: 3px;
-  background-color: #aaa;
-  border-radius: 50%;
-  margin: 1px 0;
+  width: 3px !important;
+  height: 3px !important;
+  background-color: #aaa !important;
+  border-radius: 50% !important;
+  margin: 1px 0 !important;
+}
+
+/* Submenu for Gear Icon */
+#ipv4-gear-submenu {
+  position: absolute;
+  right: 5px; 
+  background-color: white;
+  border: 1px solid #ccc;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+  z-index: 2147483647; 
+  border-radius: 3px;
+  padding: 5px 0;
+  min-width: 100px; 
+  display: none; 
+}
+
+#ipv4-gear-submenu div {
+  padding: 8px 15px; 
+  font-size: 12px;
+  color: #333;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#ipv4-gear-submenu div:hover {
+  background-color: #f0f0f0;
+  color: #000;
+}
+
+#ipv4-banner {
+  font-weight: normal !important;
+  text-align: left !important;
+  vertical-align: baseline !important;
+}
+
+#ipv4-banner * {
+  background-image: none !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+  margin: 0;
+  padding: 0;
+  border: 0; 
+}
+
+#ipv4-banner.ipv4-banner-base {
+  box-shadow: rgba(0, 0, 0, 0.2) 0px 0px 8px 0px !important;
+}
+
+#ipv4-banner a {
+  text-decoration: none !important;
+}
+#ipv4-banner a:hover {
+  text-decoration: none !important;
+}
+
+@media print {
+  #ipv4-banner {
+    display: none !important;
+  }
 }

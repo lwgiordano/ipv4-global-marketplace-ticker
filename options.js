@@ -3,8 +3,18 @@
 document.addEventListener('DOMContentLoaded', function() {
     const excludedDomainsTextarea = document.getElementById('excludedDomains');
     const blockSizeFilterSelect = document.getElementById('blockSizeFilter');
-    const rirFilterSelect = document.getElementById('rirFilter'); // New RIR filter select
+    const rirFilterSelect = document.getElementById('rirFilter');
+    const animationSpeedSlider = document.getElementById('animationSpeedSlider'); // New slider
+    const speedLabel = document.getElementById('speedLabel'); // New label display
     const saveStatusDiv = document.getElementById('saveStatus');
+
+    const speedSettings = [
+        { label: "Very Slow", display: "Very Slow (0.25x)", multiplier: 0.25 },
+        { label: "Slow", display: "Slow (0.5x)", multiplier: 0.5 },
+        { label: "Normal", display: "Normal (1x)", multiplier: 1.0 },
+        { label: "Fast", display: "Fast (1.5x)", multiplier: 1.5 },
+        { label: "Very Fast", display: "Very Fast (2x)", multiplier: 2.0 }
+    ];
 
     // Populate block size dropdown (/24 down to /14)
     for (let i = 24; i >= 14; i--) {
@@ -14,14 +24,22 @@ document.addEventListener('DOMContentLoaded', function() {
         blockSizeFilterSelect.appendChild(option);
     }
 
+    // Update speed label based on slider value
+    function updateSpeedLabel() {
+        const sliderValue = parseInt(animationSpeedSlider.value, 10);
+        if (speedSettings[sliderValue]) {
+            speedLabel.textContent = speedSettings[sliderValue].display;
+        }
+    }
+
     // Load saved settings when the options page opens
     function loadSettings() {
         if (chrome && chrome.storage && chrome.storage.local) {
-            // Keys to retrieve from storage
             const keysToGet = [
                 'excludedDomainsText',
                 'selectedBlockSize',
-                'selectedRir' // New key for RIR filter
+                'selectedRir',
+                'animationSpeedSetting' // New key for animation speed
             ];
 
             chrome.storage.local.get(keysToGet, function(items) {
@@ -33,7 +51,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 excludedDomainsTextarea.value = items.excludedDomainsText || '';
                 blockSizeFilterSelect.value = items.selectedBlockSize || '';
-                rirFilterSelect.value = items.selectedRir || ''; // Load RIR filter
+                rirFilterSelect.value = items.selectedRir || '';
+                animationSpeedSlider.value = items.animationSpeedSetting !== undefined ? items.animationSpeedSetting : '2'; // Default to Normal (index 2)
+                updateSpeedLabel(); // Update the label after loading
                 console.log("Settings loaded:", items);
             });
         } else {
@@ -47,13 +67,15 @@ document.addEventListener('DOMContentLoaded', function() {
     function saveSettings() {
         const excludedDomains = excludedDomainsTextarea.value;
         const selectedBlockSize = blockSizeFilterSelect.value;
-        const selectedRir = rirFilterSelect.value; // Get selected RIR
+        const selectedRir = rirFilterSelect.value;
+        const animationSpeedSetting = animationSpeedSlider.value; // Get selected speed setting
 
         if (chrome && chrome.storage && chrome.storage.local) {
             chrome.storage.local.set({
                 excludedDomainsText: excludedDomains,
                 selectedBlockSize: selectedBlockSize,
-                selectedRir: selectedRir // Save RIR filter
+                selectedRir: selectedRir,
+                animationSpeedSetting: animationSpeedSetting // Save animation speed
             }, function() {
                 if (chrome.runtime.lastError) {
                     console.error("Error saving settings:", chrome.runtime.lastError.message);
@@ -65,8 +87,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log("Settings saved:", {
                         excludedDomainsText: excludedDomains,
                         selectedBlockSize: selectedBlockSize,
-                        selectedRir: selectedRir
+                        selectedRir: selectedRir,
+                        animationSpeedSetting: animationSpeedSetting
                     });
+                    updateSpeedLabel(); // Update label on save
                     setTimeout(() => { saveStatusDiv.textContent = ''; }, 2000);
                 }
             });
@@ -80,7 +104,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add event listeners to save on change
     if(excludedDomainsTextarea) excludedDomainsTextarea.addEventListener('input', saveSettings);
     if(blockSizeFilterSelect) blockSizeFilterSelect.addEventListener('change', saveSettings);
-    if(rirFilterSelect) rirFilterSelect.addEventListener('change', saveSettings); // Event listener for RIR filter
+    if(rirFilterSelect) rirFilterSelect.addEventListener('change', saveSettings);
+    if(animationSpeedSlider) animationSpeedSlider.addEventListener('input', () => { // Use 'input' for live update
+        updateSpeedLabel();
+        saveSettings(); // Also save when slider is adjusted
+    });
 
     // Load settings initially
     loadSettings();
