@@ -349,18 +349,48 @@
       e.stopPropagation();
       toggleGearSubmenu(false);
 
-      // Open options page
+      // Open options page via background script
       if (isChromeAvailable()) {
         try {
-          chrome.runtime.openOptionsPage();
+          chrome.runtime.sendMessage({ type: 'openOptions' }, (response) => {
+            if (chrome.runtime.lastError) {
+              log.error('[IPv4 Banner] Error sending openOptions message:', chrome.runtime.lastError.message);
+            } else if (!response || response.ok === false) {
+              log.warn('[IPv4 Banner] openOptionsPage reported failure:', response && response.error);
+            } else {
+              log.info('[IPv4 Banner] openOptionsPage triggered via background.');
+            }
+          });
         } catch (err) {
-          log.error('[IPv4 Banner] Error opening options page:', err);
+          log.error('[IPv4 Banner] Exception while requesting options page:', err);
         }
       } else {
         log.warn('[IPv4 Banner] Chrome API not available, cannot open options page');
       }
     });
     submenu.appendChild(optionsItem);
+
+    // 3) Close
+    const closeItem = document.createElement('div');
+    closeItem.textContent = 'Close';
+    closeItem.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleGearSubmenu(false);
+
+      // Fully clean up the banner on this page
+      try {
+        cleanup(true, { type: 'manualClose' });
+      } catch (err) {
+        log.warn('[IPv4 Banner] Error during manual Close cleanup:', err);
+        // Fallback: just remove the banner node if cleanup blew up
+        const banner = document.getElementById('ipv4-banner');
+        if (banner && banner.parentNode) {
+          banner.parentNode.removeChild(banner);
+        }
+      }
+    });
+    submenu.appendChild(closeItem);
   }
 
   function toggleMinimized(banner, force = null) { 
