@@ -15,7 +15,8 @@
   font-size: 12px !important;
   border-radius: 4px !important;
   opacity: 0.95 !important;
-  overflow: visible !important; /* Allow submenu to show */
+  overflow-x: hidden !important; /* Hide horizontal overflow (ticker text) */
+  overflow-y: visible !important; /* Allow vertical overflow (dropdown menu) */
   margin: 0 !important;
   border: none !important;
   outline: none !important;
@@ -73,14 +74,14 @@
 /* Scrolling container */
 #ipv4-scroll-container {
   position: relative !important;
-  flex: 1 !important;
-  min-width: 50px !important;
+  flex: 1 1 auto !important; /* Make it a flexible item */
+  min-width: 0 !important; /* Allow it to shrink smaller than its content */
   height: 18px !important;
-  overflow: hidden !important; 
+  overflow: hidden !important;
   display: flex !important;
   align-items: center !important;
   flex-shrink: 1 !important;
-  cursor: default !important; 
+  cursor: default !important;
 }
 
 #ipv4-scroll-content {
