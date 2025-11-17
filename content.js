@@ -321,31 +321,33 @@
         e.stopPropagation();
         if (isChromeAvailable() && chrome.runtime && typeof chrome.runtime.openOptionsPage === 'function') {
             log.info("Attempting to open options page via chrome.runtime.openOptionsPage().");
-            chrome.runtime.openOptionsPage(err => { 
+            chrome.runtime.openOptionsPage(() => {
                 if (chrome.runtime.lastError) {
-                    log.warn("Failed to open options page via API:", chrome.runtime.lastError.message, "Trying fallback.");
+                    log.warn("openOptionsPage failed:", chrome.runtime.lastError.message, "- Trying fallback to direct URL.");
                     try {
                         const optionsUrl = chrome.runtime.getURL('options.html');
                         window.open(optionsUrl, '_blank');
+                        log.info("Fallback: Opened options.html via direct URL.");
                     } catch (urlError) {
-                        log.error("Failed to get options.html URL for fallback:", urlError);
-                         alert("Could not open options page. Please check extension permissions or manifest.");
+                        log.error("Fallback failed - could not get options.html URL:", urlError);
+                        alert("Could not open options page. The page may be blocked by Chrome or another extension.\n\nTry opening it from chrome://extensions → IPv4.Global Marketplace Ticker → Details → Extension options");
                     }
                 } else {
-                    log.info("Options page opened (or attempt made) successfully via API.");
+                    log.info("Options page opened successfully via chrome.runtime.openOptionsPage().");
                 }
             });
         } else {
-            log.warn("chrome.runtime.openOptionsPage API not available or runtime not defined, trying direct URL.");
+            log.warn("chrome.runtime.openOptionsPage not available, using direct URL fallback.");
             try {
                 const optionsUrl = chrome.runtime.getURL('options.html');
                 window.open(optionsUrl, '_blank');
+                log.info("Opened options.html directly (API not available).");
             } catch (urlError) {
-                log.error("Failed to get options.html URL:", urlError);
+                log.error("Failed to open options page:", urlError);
                 alert("Could not open options page. Extension APIs not fully available.");
             }
         }
-        if (isGearSubmenuOpen) toggleGearSubmenu(); 
+        if (isGearSubmenuOpen) toggleGearSubmenu();
     };
     submenu.appendChild(optionsItem);
 
