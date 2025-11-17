@@ -2,7 +2,7 @@
 /* Base styles for the banner */
 .ipv4-banner-base {
   position: fixed !important;
-  z-index: 2147483647 !important;
+  z-index: 2147483646 !important;
   background-color: white !important;
   box-shadow: rgba(0, 0, 0, 0.2) 0px 0px 8px 0px !important;
   color: black !important;
