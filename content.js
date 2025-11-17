@@ -165,12 +165,53 @@
     return gearButton;
   }
 
-  function _createGearSubmenuElement() {
-    const submenu = document.createElement('div');
-    submenu.id = 'ipv4-gear-submenu';
+  function _ensureGearSubmenuElement() {
+    let submenu = document.getElementById('ipv4-gear-submenu');
+    if (!submenu) {
+      submenu = document.createElement('div');
+      submenu.id = 'ipv4-gear-submenu';
+      submenu.style.display = 'none';
+      document.body.appendChild(submenu);
+    }
     return submenu;
   }
-  
+
+  function positionGearSubmenu() {
+    const submenu = _ensureGearSubmenuElement();
+    const gearButton = document.getElementById('ipv4-gear-button');
+    if (!gearButton) return;
+
+    const gearRect = gearButton.getBoundingClientRect();
+    const submenuRect = submenu.getBoundingClientRect();
+
+    // Prefer below the button, but flip above if needed
+    let top = gearRect.bottom + 4;
+    if (top + submenuRect.height > window.innerHeight - 4) {
+      top = Math.max(4, gearRect.top - submenuRect.height - 4);
+    }
+
+    // Align right edge of menu with right edge of button
+    let left = gearRect.right - submenuRect.width;
+    if (left < 4) left = 4;
+
+    submenu.style.top = `${top}px`;
+    submenu.style.left = `${left}px`;
+    submenu.style.right = 'auto';
+    submenu.style.bottom = 'auto';
+  }
+
+  function handleClickOutsideGearSubmenu(e) {
+    const submenu = document.getElementById('ipv4-gear-submenu');
+    const gearButton = document.getElementById('ipv4-gear-button');
+    if (!submenu || !gearButton) return;
+
+    if (!submenu.contains(e.target) && !gearButton.contains(e.target)) {
+      submenu.style.display = 'none';
+      isGearSubmenuOpen = false;
+      document.removeEventListener('click', handleClickOutsideGearSubmenu, true);
+    }
+  }
+
   // ENSURED DEFINITIONS FOR createTextLogo and updateLogo
   function createTextLogo() {
     const logoText = document.createElement('span');
@@ -260,125 +301,60 @@
   function positionToRightSide(b){if(!b)return false;b.style.left='auto';b.style.right=CONFIG.edgeGap+'px';dragState.isUsingLeft=false;clearLeftPosition();lastPositioningTime=Date.now();return true;}
   function ensureBannerInViewport(banner){ if(!banner) banner = document.getElementById('ipv4-banner'); if(!banner) return; /* ... */ }
 
-  function toggleGearSubmenu() {
-    const submenu = document.getElementById('ipv4-gear-submenu');
-    const gearButton = document.getElementById('ipv4-gear-button');
+  function toggleGearSubmenu(forceOpen) {
+    const submenu = _ensureGearSubmenuElement();
 
-    if (!submenu || !gearButton) {
-      log.warn("Submenu or gear button not found in toggleGearSubmenu");
-      return;
-    }
-
-    // If it's open, close it and exit
-    if (isGearSubmenuOpen) {
+    const shouldOpen = (typeof forceOpen === 'boolean') ? forceOpen : !isGearSubmenuOpen;
+    if (!shouldOpen) {
       submenu.style.display = 'none';
       isGearSubmenuOpen = false;
-      document.removeEventListener('click', handleClickOutsideSubmenu, true);
+      document.removeEventListener('click', handleClickOutsideGearSubmenu, true);
       return;
     }
 
-    // Opening: populate and show
     updateGearSubmenu();
     submenu.style.display = 'block';
-
-    // Position submenu near the gear button (bottom-right aligned)
-    const gearRect = gearButton.getBoundingClientRect();
-    const submenuRect = submenu.getBoundingClientRect();
-
-    let top = gearRect.bottom + 4;
-    if (top + submenuRect.height > window.innerHeight - 4) {
-      // Not enough room below – open above
-      top = Math.max(4, gearRect.top - submenuRect.height - 4);
-    }
-
-    let left = gearRect.right - submenuRect.width;
-    if (left < 4) {
-      left = 4;
-    }
-
-    submenu.style.top = `${top}px`;
-    submenu.style.left = `${left}px`;
-    submenu.style.right = 'auto';
-    submenu.style.bottom = 'auto';
-
+    positionGearSubmenu();
     isGearSubmenuOpen = true;
-    document.addEventListener('click', handleClickOutsideSubmenu, true);
-  }
-  
-  function handleClickOutsideSubmenu(event) {
-    const submenu = document.getElementById('ipv4-gear-submenu');
-    const gearButton = document.getElementById('ipv4-gear-button');
-    if (submenu && gearButton && !submenu.contains(event.target) && !gearButton.contains(event.target)) {
-        if (isGearSubmenuOpen) { 
-            toggleGearSubmenu(); 
-        }
-    }
+
+    // Close when clicking anywhere else
+    document.addEventListener('click', handleClickOutsideGearSubmenu, true);
   }
 
   function updateGearSubmenu() {
-    const submenu = document.getElementById('ipv4-gear-submenu');
-    if (!submenu) { log.warn("updateGearSubmenu: Submenu element not found."); return; }
-    submenu.innerHTML = ''; 
+    const submenu = _ensureGearSubmenuElement();
+    submenu.innerHTML = '';
 
-    const banner = document.getElementById('ipv4-banner');
+    // 1) Minimize / Expand
+    const toggleItem = document.createElement('div');
+    toggleItem.textContent = isMinimized ? 'Expand ticker' : 'Minimize ticker';
+    toggleItem.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const banner = document.getElementById('ipv4-banner');
+      if (banner) {
+        toggleMinimized(banner);
+      }
+      toggleGearSubmenu(false);
+    });
+    submenu.appendChild(toggleItem);
 
-    const toggleMinimizeItem = document.createElement('div');
-    toggleMinimizeItem.textContent = isMinimized ? 'Expand' : 'Minimize';
-    toggleMinimizeItem.onclick = (e) => {
-        e.stopPropagation();
-        if (banner) {
-            toggleMinimized(banner); 
-        } else {
-            log.warn("Minimize/Expand clicked but banner not found.");
-        }
-        if (isGearSubmenuOpen) toggleGearSubmenu(); 
-    };
-    submenu.appendChild(toggleMinimizeItem);
-
+    // 2) Options
     const optionsItem = document.createElement('div');
     optionsItem.textContent = 'Options';
-    optionsItem.onclick = (e) => {
-        e.stopPropagation();
-        if (isChromeAvailable()) {
-            log.info("Sending 'openOptions' message to background script.");
-            chrome.runtime.sendMessage({ type: 'openOptions' }, (response) => {
-                if (chrome.runtime.lastError) {
-                    log.warn('[IPv4 Banner] openOptions error:', chrome.runtime.lastError.message);
-                } else {
-                    log.info('[IPv4 Banner] openOptions response:', response);
-                }
-            });
-        } else {
-            log.warn("Chrome runtime not available for opening options.");
+    optionsItem.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        if (chrome && chrome.runtime && chrome.runtime.openOptionsPage) {
+          chrome.runtime.openOptionsPage();
         }
-        if (isGearSubmenuOpen) toggleGearSubmenu();
-    };
+      } catch (err) {
+        log.warn('[IPv4 Banner] Error opening options from menu:', err);
+      }
+      toggleGearSubmenu(false);
+    });
     submenu.appendChild(optionsItem);
-
-    const closeItem = document.createElement('div');
-    closeItem.textContent = 'Close';
-    closeItem.onclick = (e) => {
-        e.stopPropagation();
-        const bannerToClose = document.getElementById('ipv4-banner');
-        const submenuToClose = document.getElementById('ipv4-gear-submenu');
-        if (bannerToClose) {
-            log.info("Close button: Removing banner and setting isDestroyed=true for this session.");
-            bannerToClose.remove();
-            isDestroyed = true;
-            bannerCreated = false;
-        } else {
-            log.warn("Close button: Banner not found to remove.");
-        }
-        if (submenuToClose) {
-            submenuToClose.remove();
-            log.info("Close button: Submenu removed.");
-        }
-        if (isGearSubmenuOpen) {
-            isGearSubmenuOpen = false;
-            document.removeEventListener('click', handleClickOutsideSubmenu, true);
-        }
-    };
-    submenu.appendChild(closeItem);
   }
 
   function toggleMinimized(banner, force = null) { 
@@ -570,16 +546,8 @@
       const scE = _createScrollContainerElement(); b.appendChild(scE);
       const gearBtnE = _createGearButtonElement(); b.appendChild(gearBtnE);
 
-      // Remove any existing submenu instance first to avoid duplicates
-      const existingSubmenu = document.getElementById('ipv4-gear-submenu');
-      if (existingSubmenu && existingSubmenu.parentNode) {
-        existingSubmenu.parentNode.removeChild(existingSubmenu);
-        log.info("Removed existing submenu before creating new one.");
-      }
-
-      // Create a fresh submenu and attach it to <body> so it isn't clipped by the banner
-      const submenuE = _createGearSubmenuElement();
-      document.body.appendChild(submenuE); 
+      // Ensure the submenu element exists (it will be attached to <body>)
+      _ensureGearSubmenuElement(); 
 
 
       tE.classList.toggle('ipv4-element-hidden', isMinimized);
