@@ -1,6 +1,6 @@
-// content.js (v33.3 - Fix for getValidPriceString and other regressions)
+// content.js (v33.4 - Fix minimized width overflow and Options link)
 (async function() { 
-  console.log('[IPv4 Banner] content.js script executing (v33.3)...');
+  console.log('[IPv4 Banner] content.js script executing (v33.4)...');
 
   const CONFIG = {
     refreshInterval: 60000,
@@ -319,33 +319,20 @@
     optionsItem.textContent = 'Options';
     optionsItem.onclick = (e) => {
         e.stopPropagation();
-        if (isChromeAvailable() && chrome.runtime && typeof chrome.runtime.openOptionsPage === 'function') {
-            log.info("Attempting to open options page via chrome.runtime.openOptionsPage().");
-            chrome.runtime.openOptionsPage(err => { 
-                if (chrome.runtime.lastError) {
-                    log.warn("Failed to open options page via API:", chrome.runtime.lastError.message, "Trying fallback.");
-                    try {
-                        const optionsUrl = chrome.runtime.getURL('options.html');
-                        window.open(optionsUrl, '_blank');
-                    } catch (urlError) {
-                        log.error("Failed to get options.html URL for fallback:", urlError);
-                         alert("Could not open options page. Please check extension permissions or manifest.");
-                    }
-                } else {
-                    log.info("Options page opened (or attempt made) successfully via API.");
-                }
-            });
-        } else {
-            log.warn("chrome.runtime.openOptionsPage API not available or runtime not defined, trying direct URL.");
+        if (isChromeAvailable()) {
             try {
                 const optionsUrl = chrome.runtime.getURL('options.html');
+                log.info("Opening options page at:", optionsUrl);
                 window.open(optionsUrl, '_blank');
             } catch (urlError) {
-                log.error("Failed to get options.html URL:", urlError);
-                alert("Could not open options page. Extension APIs not fully available.");
+                log.error("Failed to open options page:", urlError);
+                alert("Could not open options page. Please check extension installation.");
             }
+        } else {
+            log.warn("Chrome API not available, cannot open options page.");
+            alert("Extension API not available. Please reload the page.");
         }
-        if (isGearSubmenuOpen) toggleGearSubmenu(); 
+        if (isGearSubmenuOpen) toggleGearSubmenu();
     };
     submenu.appendChild(optionsItem);
 
@@ -401,11 +388,12 @@
         if (scrollContainer) scrollContainer.classList.remove('ipv4-element-hidden'); 
         
         let currentMinimizedWidth = banner.offsetWidth; 
-        if (currentMinimizedWidth < CONFIG.minWidth / 3 || currentMinimizedWidth > CONFIG.minWidth ) { 
-            const dragHandleWidth = document.getElementById('ipv4-drag-handle')?.offsetWidth || 16; 
+        if (currentMinimizedWidth < CONFIG.minWidth / 3 || currentMinimizedWidth > CONFIG.minWidth ) {
+            const dragHandleWidth = document.getElementById('ipv4-drag-handle')?.offsetWidth || 16;
             const logoLinkWidth = document.getElementById('ipv4-logo-link')?.offsetWidth || CONFIG.minIconSize + 4;
-            const gearBtnWidth = document.getElementById('ipv4-gear-button')?.offsetWidth || 24; 
-            currentMinimizedWidth = dragHandleWidth + logoLinkWidth + gearBtnWidth + (CONFIG.minimizedSpacing * 2) + CONFIG.normalSpacing + 8;
+            const gearBtnWidth = document.getElementById('ipv4-gear-button')?.offsetWidth || 24;
+            const bannerHorizontalPadding = 16; // 8px left + 8px right padding from CSS
+            currentMinimizedWidth = dragHandleWidth + logoLinkWidth + gearBtnWidth + (CONFIG.minimizedSpacing * 2) + CONFIG.normalSpacing + bannerHorizontalPadding;
         }
         banner.style.width = currentMinimizedWidth + 'px'; 
         log.info("Start expand animation from width:", currentMinimizedWidth); 
@@ -438,10 +426,11 @@
         banner.offsetHeight; 
         banner.style.transition = 'width ' + CONFIG.minimizeAnimationDuration + 'ms ease-in'; 
         
-        const dhw = document.getElementById('ipv4-drag-handle')?.offsetWidth || 16; 
-        const llw = document.getElementById('ipv4-logo-link')?.offsetWidth || CONFIG.minIconSize; 
-        const gbW = document.getElementById('ipv4-gear-button')?.offsetWidth || 24; 
-        const amcw = dhw + llw + gbW + (CONFIG.minimizedSpacing * 2) + (CONFIG.normalSpacing) ; 
+        const dhw = document.getElementById('ipv4-drag-handle')?.offsetWidth || 16;
+        const llw = document.getElementById('ipv4-logo-link')?.offsetWidth || CONFIG.minIconSize;
+        const gbW = document.getElementById('ipv4-gear-button')?.offsetWidth || 24;
+        const bannerHorizontalPadding = 16; // 8px left + 8px right padding from CSS
+        const amcw = dhw + llw + gbW + (CONFIG.minimizedSpacing * 2) + (CONFIG.normalSpacing) + bannerHorizontalPadding; 
         
         banner.style.width = amcw + 'px'; 
         log.info("Minimizing: animating to width approx:", amcw); 
