@@ -299,6 +299,7 @@
     submenu.style.top = `${top}px`;
     submenu.style.left = `${left}px`;
     submenu.style.right = 'auto';
+    submenu.style.bottom = 'auto';
 
     isGearSubmenuOpen = true;
     document.addEventListener('click', handleClickOutsideSubmenu, true);
@@ -358,16 +359,24 @@
     closeItem.textContent = 'Close';
     closeItem.onclick = (e) => {
         e.stopPropagation();
-        const bannerToClose = document.getElementById('ipv4-banner'); 
+        const bannerToClose = document.getElementById('ipv4-banner');
+        const submenuToClose = document.getElementById('ipv4-gear-submenu');
         if (bannerToClose) {
             log.info("Close button: Removing banner and setting isDestroyed=true for this session.");
-            bannerToClose.remove(); 
-            isDestroyed = true; 
-            bannerCreated = false; 
+            bannerToClose.remove();
+            isDestroyed = true;
+            bannerCreated = false;
         } else {
             log.warn("Close button: Banner not found to remove.");
         }
-        if (isGearSubmenuOpen) toggleGearSubmenu();
+        if (submenuToClose) {
+            submenuToClose.remove();
+            log.info("Close button: Submenu removed.");
+        }
+        if (isGearSubmenuOpen) {
+            isGearSubmenuOpen = false;
+            document.removeEventListener('click', handleClickOutsideSubmenu, true);
+        }
     };
     submenu.appendChild(closeItem);
   }
@@ -561,8 +570,15 @@
       const scE = _createScrollContainerElement(); b.appendChild(scE);
       const gearBtnE = _createGearButtonElement(); b.appendChild(gearBtnE);
 
+      // Remove any existing submenu instance first to avoid duplicates
+      const existingSubmenu = document.getElementById('ipv4-gear-submenu');
+      if (existingSubmenu && existingSubmenu.parentNode) {
+        existingSubmenu.parentNode.removeChild(existingSubmenu);
+        log.info("Removed existing submenu before creating new one.");
+      }
+
+      // Create a fresh submenu and attach it to <body> so it isn't clipped by the banner
       const submenuE = _createGearSubmenuElement();
-      // Attach submenu to the document body so it isn't clipped by the banner
       document.body.appendChild(submenuE); 
 
 
@@ -812,15 +828,20 @@
     if (observer) { observer.disconnect(); observer = null; } 
     
     const banner = document.getElementById('ipv4-banner');
+    const submenu = document.getElementById('ipv4-gear-submenu');
     if (fullCleanup) {
-        isDestroyed = true; 
+        isDestroyed = true;
         if (banner && banner.parentNode) {
-            try { banner.parentNode.removeChild(banner); log.info("Banner removed from DOM due to full cleanup."); } 
+            try { banner.parentNode.removeChild(banner); log.info("Banner removed from DOM due to full cleanup."); }
             catch (e) { log.warn('Error removing banner during full cleanup:', e); }
         }
-        bannerCreated = false; 
-        releaseInitLock(); 
-    } else if (banner && event && (event.type === 'pagehide' || event.type === 'beforeunload')) { 
+        if (submenu && submenu.parentNode) {
+            try { submenu.parentNode.removeChild(submenu); log.info("Submenu removed from DOM due to full cleanup."); }
+            catch (e) { log.warn('Error removing submenu during full cleanup:', e); }
+        }
+        bannerCreated = false;
+        releaseInitLock();
+    } else if (banner && event && (event.type === 'pagehide' || event.type === 'beforeunload')) {
         log.info(`Cleanup for ${event.type}: Not removing banner from DOM, observer disconnected.`);
     }
   }
