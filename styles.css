@@ -81,6 +81,7 @@
 /* Logo styling when banner is minimized */
 .ipv4-banner-minimized #ipv4-logo {
   max-height: 16px !important;
+  margin-top: 0 !important;
 }
 
 /* Scrolling container */
