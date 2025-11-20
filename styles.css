@@ -53,7 +53,12 @@
   margin-right: 0 !important;
   white-space: nowrap !important;
   flex-shrink: 0 !important;
-  cursor: pointer !important; 
+  cursor: pointer !important;
+}
+
+/* Title styling when banner is expanded (not minimized) */
+#ipv4-banner:not(.ipv4-banner-minimized) .banner-title-style {
+  margin-left: 10px !important;
 }
 
 /* Logo styling */
