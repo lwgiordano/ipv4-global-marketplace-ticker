@@ -684,7 +684,25 @@
                     if (CONFIG.debug && (!priceStr || priceStr === "$")) { log.warn('New Listing item missing price or only "$":', item); }
                     if (!priceStr || priceStr === "$") priceStr = '$??';
                 }
-                return `<span class="prefix">/${blockStr}</span> <span class="registry">${regionStr}</span> <span class="price">${priceStr}</span>`;
+
+                // Get auction ID from item (try multiple possible field names)
+                const auctionId = item.auctionId || item.auction_id || item.id || item.listingId || item.listing_id;
+
+                if (CONFIG.debug && auctionId) {
+                    log.info(`Found auction ID for /${blockStr} ${regionStr}: ${auctionId}`);
+                } else if (CONFIG.debug && !auctionId) {
+                    log.warn(`No auction ID found for item:`, item);
+                }
+
+                // Create the ticker content
+                const tickerContent = `<span class="prefix">/${blockStr}</span> <span class="registry">${regionStr}</span> <span class="price">${priceStr}</span>`;
+
+                // Wrap in anchor tag if auction ID exists
+                if (auctionId) {
+                    return `<a href="https://auctions.ipv4.global/auction/${auctionId}" target="_blank" class="ticker-link">${tickerContent}</a>`;
+                } else {
+                    return tickerContent;
+                }
             });
             const validItems = htmlItems.filter(item => item);
 
