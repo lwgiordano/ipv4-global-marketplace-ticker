@@ -113,8 +113,13 @@
   display: inline-block !important;
   transition: opacity 0.2s ease !important;
 }
+/* When hovering over the scroll content, fade all ticker links */
+#ipv4-scroll-content:hover .ticker-link {
+  opacity: 0.7 !important;
+}
+/* Keep the actually hovered link at full opacity */
 #ipv4-banner .ticker-link:hover {
-  opacity: 0.8 !important;
+  opacity: 1 !important;
   text-decoration: none !important;
 }
 #ipv4-banner .ticker-link:visited {
