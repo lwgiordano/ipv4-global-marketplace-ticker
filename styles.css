@@ -106,6 +106,21 @@
   font-weight: bold !important;
 }
 
+/* Ticker link styling */
+#ipv4-banner .ticker-link {
+  text-decoration: none !important;
+  cursor: pointer !important;
+  display: inline-block !important;
+  transition: opacity 0.2s ease !important;
+}
+#ipv4-banner .ticker-link:hover {
+  opacity: 0.8 !important;
+  text-decoration: none !important;
+}
+#ipv4-banner .ticker-link:visited {
+  text-decoration: none !important;
+}
+
 /* Gear button styles (replaces #ipv4-toggle-button) */
 #ipv4-gear-button {
   font-size: 18px !important;
