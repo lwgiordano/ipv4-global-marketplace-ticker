@@ -105,6 +105,16 @@
   const fallbackData = { [VIEW_MODES.PRIOR_SALES]: [ { block: 19, region: "arin", pricePerAddress: "$29" }, { block: 24, region: "arin", pricePerAddress: "$32.5" },{ block: 19, region: "ripe", pricePerAddress: "$30" }, { block: 22, region: "ripe", pricePerAddress: "$31.9" },{ block: 22, region: "lacnic", pricePerAddress: "$34.5" }, { block: 22, region: "arin", pricePerAddress: "$34" },{ block: 24, region: "arin", pricePerAddress: "$36" } ], [VIEW_MODES.NEW_LISTINGS]: [ { block: 24, region: "arin", askingPrice: "$35" }, { block: 22, region: "ripe", askingPrice: "$31.5" }, { block: 23, region: "apnic", askingPrice: "$32" }, { block: 21, region: "arin", askingPrice: "$30" }, { block: 24, region: "lacnic", askingPrice: "$33.5" }, { block: 23, region: "arin", askingPrice: "$31" }, { block: 22, region: "arin", askingPrice: "$29.5" } ] };
 
   // --- HELPER FUNCTIONS ---
+  function getAuctionId(item) {
+    // Try multiple possible field names for auction ID
+    const possibleFields = ['auctionId', 'auction_id', 'id', 'listingId', 'listing_id', '_id'];
+    for (const field of possibleFields) {
+      if (item[field] !== undefined && item[field] !== null && item[field] !== '') {
+        return item[field].toString();
+      }
+    }
+    return null;
+  }
   function isChromeAvailable() { try { return typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id && chrome.runtime.sendMessage; } catch (e) { return false; } }
   async function getAllSettings() { return new Promise(resolve => { if (!isChromeAvailable()) { resolve(currentSettings); return; } chrome.storage.local.get(null, items => { if (chrome.runtime.lastError) { log.warn('Error reading all settings:', chrome.runtime.lastError.message); resolve(currentSettings); } else { currentSettings = items || {}; settingsLoaded = true; resolve(currentSettings); } }); }); }
   async function getSetting(key, defaultValue) { if (settingsLoaded && key in currentSettings) return currentSettings[key]; return new Promise(resolve => { if (!isChromeAvailable()) { resolve(defaultValue); return; } chrome.storage.local.get([key], result => { if (chrome.runtime.lastError) { log.warn(`Error reading setting ${key}:`, chrome.runtime.lastError.message); resolve(defaultValue); } else { const value = result[key]; currentSettings[key] = value; resolve(value !== undefined ? value : defaultValue); } }); }); }
@@ -684,7 +694,16 @@
                     if (CONFIG.debug && (!priceStr || priceStr === "$")) { log.warn('New Listing item missing price or only "$":', item); }
                     if (!priceStr || priceStr === "$") priceStr = '$??';
                 }
-                return `<span class="prefix">/${blockStr}</span> <span class="registry">${regionStr}</span> <span class="price">${priceStr}</span>`;
+
+                // Get auction ID and create link if available
+                const auctionId = getAuctionId(item);
+                const itemContent = `<span class="prefix">/${blockStr}</span> <span class="registry">${regionStr}</span> <span class="price">${priceStr}</span>`;
+
+                if (auctionId) {
+                    return `<a href="https://auctions.ipv4.global/auction/${auctionId}" target="_blank" class="ticker-link">${itemContent}</a>`;
+                } else {
+                    return itemContent;
+                }
             });
             const validItems = htmlItems.filter(item => item);
 
