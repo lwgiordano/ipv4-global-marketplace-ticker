@@ -74,8 +74,9 @@
 /* Scrolling container */
 #ipv4-scroll-container {
   position: relative !important;
-  flex: 1 1 auto !important; /* Make it a flexible item */
+  flex: 1 1 0 !important; /* Make it grow to fill available space */
   min-width: 0 !important; /* Allow it to shrink smaller than its content */
+  width: 100% !important; /* Ensure it fills available space */
   height: 18px !important;
   overflow: hidden !important;
   display: flex !important;

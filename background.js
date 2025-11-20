@@ -22,7 +22,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Origin': 'https://auctions.ipv4.global',
         'Cache-Control': 'no-cache'
       },
       body: request.body
