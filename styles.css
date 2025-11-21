@@ -1,14 +1,14 @@
-/* styles.css (v33.4 - Enhanced CSS Isolation) */
+/* styles.css (v33.5 - Fixed CSS Isolation) */
 
 /* ========================================
    COMPREHENSIVE CSS ISOLATION & RESET
    Prevents page CSS from interfering with ticker
    ======================================== */
 
-/* Reset all properties for banner and submenu to prevent page CSS interference */
-#ipv4-banner,
+/* Reset all properties for child elements to prevent page CSS interference */
+/* Note: We only reset children (*), not the banner/submenu containers themselves */
+/* This allows the banner's own positioning and display properties to work correctly */
 #ipv4-banner *,
-#ipv4-gear-submenu,
 #ipv4-gear-submenu * {
   all: initial !important;
   font-family: Arial, sans-serif !important;
