@@ -189,7 +189,7 @@
 
 /* Gear button styling when banner is minimized */
 .ipv4-banner-minimized #ipv4-gear-button {
-  margin-right: 0px !important;
+  margin-left: 0px !important;
 }
 
 /* Submenu for Gear Icon */
