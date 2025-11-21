@@ -182,6 +182,16 @@
   margin: 1px 0 !important;
 }
 
+/* Drag handle styling when banner is minimized */
+.ipv4-banner-minimized #ipv4-drag-handle {
+  margin-right: 4px !important;
+}
+
+/* Gear button styling when banner is minimized */
+.ipv4-banner-minimized #ipv4-gear-button {
+  margin-right: 0px !important;
+}
+
 /* Submenu for Gear Icon */
 #ipv4-gear-submenu {
   /* Free-floating overlay, not clipped by the banner */
