@@ -9,7 +9,7 @@
   display: flex !important;
   flex-wrap: nowrap !important;
   align-items: center !important;
-  padding: 4px 8px !important;
+  padding: 4px !important;
   box-sizing: border-box !important;
   font-family: Arial, sans-serif !important;
   font-size: 12px !important;
@@ -162,14 +162,14 @@
 
 /* Drag handle styles */
 #ipv4-drag-handle {
-  cursor: move !important; 
+  cursor: move !important;
   width: 16px !important;
   height: 100% !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
   justify-content: center !important;
-  margin-right: 6px !important;
+  margin-right: 4px !important;
   position: relative !important;
   flex-shrink: 0 !important;
 }
