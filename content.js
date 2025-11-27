@@ -142,7 +142,7 @@
   async function saveLeftPosition(pos) { if (dragState.alwaysUseRight) { await clearLeftPosition(); return; } try { if (pos === null || pos < 0) await clearLeftPosition(); else await saveSetting(CONFIG.leftPosKey, pos.toString()); } catch (e) { log.warn('Error save left pos:', e); }}
   function calculateWidthPercentage(pw) { const vw = getViewportWidth(); if (vw <= 0) return 50; return Math.min(100, Math.max(1, (pw / vw) * 100)); }
   function isWidthAtMax(w) { return Math.abs(w - calculateMaxBannerWidth()) <= CONFIG.maxWidthTolerance; }
-  async function getSavedWidth() { try { if (await getSetting(CONFIG.maxWidthFlag, false)) { isAtMaxWidth = true; return calculateMaxBannerWidth(); } const wp = await getSetting(CONFIG.widthPercentKey); if (wp !== null && wp !== undefined) { const p = parseFloat(wp); if (!isNaN(p) && p > 0 && p <= 100) { const pxw = Math.round((p / 100) * getViewportWidth()); return Math.min(calculateMaxBannerWidth(), Math.max(CONFIG.minWidth, pxw)); }} const sw = await getSetting(CONFIG.widthKey); if (sw !== null && sw !== undefined) { const w = parseInt(sw); if (!isNaN(w) && w >= CONFIG.minWidth && w <= CONFIG.maxWidth) return w; }} catch (e) { log.warn('Error read width:', e); } return CONFIG.defaultWidth; }
+  async function getSavedWidth() { try { if (await getSetting(CONFIG.maxWidthFlag, false)) { isAtMaxWidth = true; return calculateMaxBannerWidth(); } const wp = await getSetting(CONFIG.widthPercentKey); if (wp !== null && wp !== undefined) { const p = parseFloat(wp); if (!isNaN(p) && p > 0 && p <= 100) { const pxw = Math.round((p / 100) * getViewportWidth()); return Math.min(calculateMaxBannerWidth(), Math.max(CONFIG.minWidth, pxw)); }} const sw = await getSetting(CONFIG.widthKey); if (sw !== null && sw !== undefined) { const w = parseInt(sw); if (!isNaN(w) && w >= CONFIG.minWidth && w <= CONFIG.maxWidth) return w; }} catch (e) { log.warn('Error read width:', e); } return calculateMaxBannerWidth(); }
   async function saveWidth(w) { try { if (w >= CONFIG.minWidth) { await saveSetting(CONFIG.widthKey, w.toString()); const wp = calculateWidthPercentage(w); await saveSetting(CONFIG.widthPercentKey, wp.toString()); const imw = isWidthAtMax(w); isAtMaxWidth = imw; await saveSetting(CONFIG.maxWidthFlag, imw); preMinimizeWidth = w; preMinimizeWidthPercent = wp; }} catch (e) { log.warn('Error save width:', e); } }
   function getViewportWidth() { return document.documentElement.clientWidth; }
   function getViewportHeight() { return document.documentElement.clientHeight; }
@@ -165,12 +165,20 @@
   function _createGearButtonElement() {
     const gearButton = document.createElement('div');
     gearButton.id = 'ipv4-gear-button';
-    gearButton.innerHTML = '☰'; 
-    gearButton.title = 'Menu';
+    gearButton.innerHTML = '☰';
+    gearButton.title = 'Menu (Double-click to minimize/expand)';
     gearButton.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         toggleGearSubmenu();
+    });
+    gearButton.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const banner = document.getElementById('ipv4-banner');
+        if (banner) {
+            toggleMinimized(banner);
+        }
     });
     return gearButton;
   }
