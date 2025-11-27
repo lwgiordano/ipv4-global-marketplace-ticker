@@ -157,7 +157,24 @@
   function calculateMaxBannerWidth() { return Math.max(CONFIG.minWidth, getViewportWidth() - (2 * CONFIG.edgeGap)); }
   
   // --- Element Creation Functions ---
-  function _createDragHandleElement() { const dh = document.createElement('div'); dh.id = 'ipv4-drag-handle'; for (let i=0;i<3;i++) { const d=document.createElement('div'); dh.appendChild(d); } dh.title = "Drag to move • Drag left/right to resize"; return dh;}
+  function _createDragHandleElement() {
+    const dh = document.createElement('div');
+    dh.id = 'ipv4-drag-handle';
+    for (let i=0;i<3;i++) {
+      const d=document.createElement('div');
+      dh.appendChild(d);
+    }
+    dh.title = "Drag to move • Drag left/right to resize • Double-click to minimize/expand";
+    dh.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const banner = document.getElementById('ipv4-banner');
+        if (banner) {
+            toggleMinimized(banner);
+        }
+    });
+    return dh;
+  }
   function _createLogoLinkElement() { const ll = document.createElement('a'); ll.id = 'ipv4-logo-link'; ll.href = 'https://auctions.ipv4.global'; ll.target = '_blank'; return ll;}
   function _createTitleElement(initialViewMode) { const t = document.createElement('span'); t.id = 'ipv4-title'; t.classList.add('banner-title-style'); t.title = initialViewMode === VIEW_MODES.PRIOR_SALES ? "Click to switch to New Listings" : "Click to switch to Prior Sales"; t.innerHTML = initialViewMode === VIEW_MODES.PRIOR_SALES ? 'Prior Sales:' : 'New Listings:'; const vp = 4; t.style.lineHeight = `${CONFIG.bannerHeight - vp}px`; t.addEventListener('click', (e) => {e.preventDefault();e.stopPropagation(); if(!isDuringToggleTransition && !isDragExpanding) toggleViewMode();}); return t;}
   function _createScrollContainerElement() { const sc = document.createElement('div'); sc.id = 'ipv4-scroll-container'; const scc = document.createElement('div'); scc.id = 'ipv4-scroll-content'; sc.appendChild(scc); return sc;}
@@ -166,19 +183,11 @@
     const gearButton = document.createElement('div');
     gearButton.id = 'ipv4-gear-button';
     gearButton.innerHTML = '☰';
-    gearButton.title = 'Menu (Double-click to minimize/expand)';
+    gearButton.title = 'Menu';
     gearButton.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         toggleGearSubmenu();
-    });
-    gearButton.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const banner = document.getElementById('ipv4-banner');
-        if (banner) {
-            toggleMinimized(banner);
-        }
     });
     return gearButton;
   }
