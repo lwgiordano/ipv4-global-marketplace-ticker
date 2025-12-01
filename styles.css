@@ -169,8 +169,8 @@
 .hamburger-icon {
   display: block !important;
   position: relative !important;
-  width: 14px !important;
-  height: 2px !important;
+  width: 11px !important;
+  height: 1.5px !important;
   background-color: #555 !important;
   border-radius: 1px !important;
 }
@@ -180,19 +180,19 @@
   content: '' !important;
   display: block !important;
   position: absolute !important;
-  width: 14px !important;
-  height: 2px !important;
+  width: 11px !important;
+  height: 1.5px !important;
   background-color: #555 !important;
   border-radius: 1px !important;
   left: 0 !important;
 }
 
 .hamburger-icon::before {
-  top: -5px !important;
+  top: -4px !important;
 }
 
 .hamburger-icon::after {
-  top: 5px !important;
+  top: 4px !important;
 }
 
 #ipv4-gear-button:hover .hamburger-icon,
