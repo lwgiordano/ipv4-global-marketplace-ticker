@@ -225,13 +225,12 @@
 
 /* Drag handle styling when banner is minimized */
 .ipv4-banner-minimized #ipv4-drag-handle {
-  margin-right: 3px !important;
+  margin-right: 2px !important;
 }
 
 /* Gear button styling when banner is minimized */
 .ipv4-banner-minimized #ipv4-gear-button {
-  margin-left: 0px !important;
-  margin-right: 2px !important;
+  margin-left: 1px !important;
 }
 
 /* Submenu for Gear Icon */
