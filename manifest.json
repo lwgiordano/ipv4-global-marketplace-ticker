@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "IPv4.Global Marketplace Ticker",
-  "version": "1.21",
+  "version": "1.22",
   "description": "Stock-like ticker displaying real-time IPv4 address block listings, transactions, and prices from the IPv4.Global marketplace",
   "icons": {
     "16": "assets/icon-16x16.png",
