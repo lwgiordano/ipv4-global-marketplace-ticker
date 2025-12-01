@@ -182,7 +182,7 @@
   function _createGearButtonElement() {
     const gearButton = document.createElement('div');
     gearButton.id = 'ipv4-gear-button';
-    gearButton.innerHTML = '☰';
+    gearButton.innerHTML = '<span class="hamburger-icon"></span>';
     gearButton.title = 'Menu';
     gearButton.addEventListener('click', (e) => {
         e.preventDefault();
