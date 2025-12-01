@@ -154,23 +154,51 @@
 
 /* Gear button styles (replaces #ipv4-toggle-button) */
 #ipv4-gear-button {
-  font-size: 18px !important;
-  font-weight: bold;
   cursor: pointer !important;
-  color: #555 !important;
   flex-shrink: 0 !important;
   padding: 0px 5px !important;
-  padding-bottom: 3px !important;
-  margin-left: 6px !important;
-  line-height: 1 !important;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  user-select: none;
+  margin-left: 4px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 100% !important;
+  user-select: none !important;
 }
-#ipv4-gear-button:hover {
-  color: #000 !important;
+
+/* Hamburger icon using CSS */
+.hamburger-icon {
+  display: block !important;
+  position: relative !important;
+  width: 11px !important;
+  height: 1.5px !important;
+  background-color: #555 !important;
+  border-radius: 1px !important;
+}
+
+.hamburger-icon::before,
+.hamburger-icon::after {
+  content: '' !important;
+  display: block !important;
+  position: absolute !important;
+  width: 11px !important;
+  height: 1.5px !important;
+  background-color: #555 !important;
+  border-radius: 1px !important;
+  left: 0 !important;
+}
+
+.hamburger-icon::before {
+  top: -4px !important;
+}
+
+.hamburger-icon::after {
+  top: 4px !important;
+}
+
+#ipv4-gear-button:hover .hamburger-icon,
+#ipv4-gear-button:hover .hamburger-icon::before,
+#ipv4-gear-button:hover .hamburger-icon::after {
+  background-color: #000 !important;
 }
 
 /* Drag handle styles */
@@ -197,12 +225,12 @@
 
 /* Drag handle styling when banner is minimized */
 .ipv4-banner-minimized #ipv4-drag-handle {
-  margin-right: 4px !important;
+  margin-right: 2px !important;
 }
 
 /* Gear button styling when banner is minimized */
 .ipv4-banner-minimized #ipv4-gear-button {
-  margin-left: 0px !important;
+  margin-left: 1px !important;
 }
 
 /* Submenu for Gear Icon */
