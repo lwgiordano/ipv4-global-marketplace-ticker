@@ -131,16 +131,14 @@
             margin: 16px 0 0 0;
         }
 
-        .filter-group.view-selector {
-            flex: 0 0 auto;
-            min-width: auto;
-            order: -1;
+        .view-selector {
             display: flex;
             align-items: flex-end;
             gap: 12px;
+            margin-bottom: 20px;
         }
 
-        .filter-group.view-selector label {
+        .view-selector label {
             font-weight: 600;
             color: #424647;
             font-size: 14px;
@@ -643,11 +641,10 @@
                 min-width: 100%;
             }
 
-            .filter-group.view-selector {
+            .view-selector {
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 8px;
-                width: 100%;
             }
 
             .view-toggle {
@@ -760,14 +757,14 @@
 
         <!-- Filters Section -->
         <div class="filters">
-            <div class="filter-row">
-                <div class="filter-group view-selector">
-                    <label>View:</label>
-                    <div class="view-toggle">
-                        <button id="viewPriorSales" class="active">Prior Sales</button>
-                        <button id="viewCurrentListings">Current Listings</button>
-                    </div>
+            <div class="view-selector">
+                <label>View:</label>
+                <div class="view-toggle">
+                    <button id="viewPriorSales" class="active">Prior Sales</button>
+                    <button id="viewCurrentListings">Current Listings</button>
                 </div>
+            </div>
+            <div class="filter-row">
                 <div class="filter-group">
                     <label for="dateFrom">From Date:</label>
                     <input type="date" id="dateFrom">
