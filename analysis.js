@@ -11,17 +11,17 @@ let newListingsData = [];
 let filteredSalesData = [];
 let filteredListingsData = [];
 
-// Color scheme
+// Modern color scheme
 const COLORS = {
-    primary: '#005398',
-    secondary: '#0066b8',
-    arin: '#FF6384',
-    ripe: '#36A2EB',
-    apnic: '#FFCE56',
-    lacnic: '#4BC0C0',
-    afrinic: '#9966FF',
-    grid: '#e0e0e0',
-    text: '#333'
+    primary: '#667eea',
+    secondary: '#764ba2',
+    arin: '#f093fb',
+    ripe: '#4facfe',
+    apnic: '#feca57',
+    lacnic: '#48dbfb',
+    afrinic: '#a29bfe',
+    grid: '#e2e8f0',
+    text: '#2c3e50'
 };
 
 // Simple Chart Library using Canvas
@@ -127,7 +127,7 @@ class SimpleChart {
                 this.ctx.moveTo(this.padding.left, y);
                 this.ctx.lineTo(this.width - this.padding.right, y);
                 this.ctx.stroke();
-                this.ctx.fillText('$' + value.toFixed(2), this.padding.left - 60, y + 4);
+                this.ctx.fillText(formatPrice(value), this.padding.left - 60, y + 4);
             }
 
             // Draw bars with animation
@@ -151,7 +151,7 @@ class SimpleChart {
                         x: x + barWidth / 2,
                         y: y,
                         radius: barWidth / 2,
-                        label: `${labels[index]}: $${value.toFixed(2)}`
+                        label: `${labels[index]}: ${formatPrice(value)}`
                     });
                 }
 
@@ -161,7 +161,7 @@ class SimpleChart {
                     this.ctx.font = 'bold 11px Arial';
                     this.ctx.textAlign = 'center';
                     this.ctx.globalAlpha = (progress - 0.7) / 0.3;
-                    this.ctx.fillText('$' + value.toFixed(2), x + barWidth / 2, y - 5);
+                    this.ctx.fillText(formatPrice(value), x + barWidth / 2, y - 5);
                     this.ctx.globalAlpha = 1;
                 }
             });
@@ -299,7 +299,7 @@ class SimpleChart {
                 this.ctx.moveTo(this.padding.left, y);
                 this.ctx.lineTo(this.width - this.padding.right, y);
                 this.ctx.stroke();
-                this.ctx.fillText('$' + value.toFixed(2), this.padding.left - 60, y + 4);
+                this.ctx.fillText(formatPrice(value), this.padding.left - 60, y + 4);
             }
 
             // Calculate how many points to draw based on animation progress
@@ -370,7 +370,7 @@ class SimpleChart {
                             x: x,
                             y: y,
                             radius: 8,
-                            label: `${labels[index]}: $${value.toFixed(2)}`
+                            label: `${labels[index]}: ${formatPrice(value)}`
                         });
                     }
                 }
@@ -407,6 +407,20 @@ class SimpleChart {
         const colorKeys = ['arin', 'ripe', 'apnic', 'lacnic', 'afrinic'];
         return COLORS[colorKeys[index % colorKeys.length]];
     }
+}
+
+// Helper function to format price with smart decimal handling
+function formatPrice(value) {
+    const num = typeof value === 'number' ? value : parseFloat(value);
+    if (isNaN(num)) return '$0';
+
+    // Check if it's a whole number
+    if (num % 1 === 0) {
+        return '$' + num.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    }
+
+    // Has decimals, show 2 decimal places
+    return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 // Helper functions for date formatting
@@ -556,9 +570,9 @@ function updateStatistics() {
     const minSalePrice = salesPrices.length > 0 ? Math.min(...salesPrices) : 0;
 
     document.getElementById('totalSales').textContent = totalSales.toLocaleString();
-    document.getElementById('avgSalePrice').textContent = '$' + avgSalePrice.toFixed(2);
-    document.getElementById('maxSalePrice').textContent = '$' + maxSalePrice.toFixed(2);
-    document.getElementById('minSalePrice').textContent = '$' + minSalePrice.toFixed(2);
+    document.getElementById('avgSalePrice').textContent = formatPrice(avgSalePrice);
+    document.getElementById('maxSalePrice').textContent = formatPrice(maxSalePrice);
+    document.getElementById('minSalePrice').textContent = formatPrice(minSalePrice);
     document.getElementById('salesStatsRow').style.display = 'flex';
 
     // New Listings Statistics
@@ -572,9 +586,9 @@ function updateStatistics() {
     const minAskingPrice = listingsPrices.length > 0 ? Math.min(...listingsPrices) : 0;
 
     document.getElementById('totalListings').textContent = totalListings.toLocaleString();
-    document.getElementById('avgAskingPrice').textContent = '$' + avgAskingPrice.toFixed(2);
-    document.getElementById('maxAskingPrice').textContent = '$' + maxAskingPrice.toFixed(2);
-    document.getElementById('minAskingPrice').textContent = '$' + minAskingPrice.toFixed(2);
+    document.getElementById('avgAskingPrice').textContent = formatPrice(avgAskingPrice);
+    document.getElementById('maxAskingPrice').textContent = formatPrice(maxAskingPrice);
+    document.getElementById('minAskingPrice').textContent = formatPrice(minAskingPrice);
     document.getElementById('listingsStatsRow').style.display = 'flex';
 }
 
