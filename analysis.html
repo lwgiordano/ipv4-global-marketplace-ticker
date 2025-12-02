@@ -360,10 +360,11 @@
         .view-toggle {
             display: inline-flex;
             gap: 0;
-            background: #F0F2F2;
+            background: #E3E5E5;
             border-radius: 4px;
             padding: 4px;
             position: relative;
+            isolation: isolate;
         }
 
         .view-toggle::before {
@@ -371,20 +372,25 @@
             position: absolute;
             top: 4px;
             left: 4px;
-            width: calc(50% - 4px);
+            width: 0;
             height: calc(100% - 8px);
             background: #0062FF;
             border-radius: 4px;
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 0;
-            pointer-events: none;
+        }
+
+        .view-toggle.init::before {
+            width: calc(50% - 4px);
         }
 
         .view-toggle.listings-active::before {
-            transform: translateX(100%);
+            left: calc(50% + 0px);
+            width: calc(50% - 4px);
         }
 
         .view-toggle button {
+            flex: 1;
             padding: 8px 16px;
             border-radius: 4px;
             border: none;
@@ -657,15 +663,15 @@
                     <div class="stat-value" id="totalSales">-</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-label">Avg Sale Price</div>
+                    <div class="stat-label">Avg Sale Price / IP</div>
                     <div class="stat-value" id="avgSalePrice">-</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-label">Highest Sale</div>
+                    <div class="stat-label">Highest Sale / IP</div>
                     <div class="stat-value" id="maxSalePrice">-</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-label">Lowest Sale</div>
+                    <div class="stat-label">Lowest Sale / IP</div>
                     <div class="stat-value" id="minSalePrice">-</div>
                 </div>
             </div>
@@ -673,7 +679,7 @@
             <h2>Prior Sales Analysis</h2>
             <div class="charts-grid">
                 <div class="chart-container">
-                    <div class="chart-title">Price Trends Over Time</div>
+                    <div class="chart-title">Price Trends Over Time (per IP)</div>
                     <canvas id="salesTrendChart"></canvas>
                 </div>
                 <div class="chart-container">
@@ -685,7 +691,7 @@
                     <canvas id="salesByBlockChart"></canvas>
                 </div>
                 <div class="chart-container">
-                    <div class="chart-title">Average Price by Block Size</div>
+                    <div class="chart-title">Average Price by Block Size (per IP)</div>
                     <canvas id="salesPriceByBlockChart"></canvas>
                 </div>
             </div>
@@ -699,15 +705,15 @@
                     <div class="stat-value" id="totalListings">-</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-label">Avg Asking Price</div>
+                    <div class="stat-label">Avg Asking Price / IP</div>
                     <div class="stat-value" id="avgAskingPrice">-</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-label">Highest Asking</div>
+                    <div class="stat-label">Highest Asking / IP</div>
                     <div class="stat-value" id="maxAskingPrice">-</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-label">Lowest Asking</div>
+                    <div class="stat-label">Lowest Asking / IP</div>
                     <div class="stat-value" id="minAskingPrice">-</div>
                 </div>
             </div>
@@ -715,7 +721,7 @@
             <h2>Current Listings Analysis</h2>
             <div class="charts-grid">
                 <div class="chart-container">
-                    <div class="chart-title">Asking Prices by Block Size</div>
+                    <div class="chart-title">Asking Prices by Block Size (per IP)</div>
                     <canvas id="listingsPriceByBlockChart"></canvas>
                 </div>
                 <div class="chart-container">
@@ -727,7 +733,7 @@
                     <canvas id="listingsByBlockChart"></canvas>
                 </div>
                 <div class="chart-container">
-                    <div class="chart-title">Price Comparison by RIR</div>
+                    <div class="chart-title">Price Comparison by RIR (per IP)</div>
                     <canvas id="listingsPriceByRirChart"></canvas>
                 </div>
             </div>
