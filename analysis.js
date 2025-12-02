@@ -545,26 +545,37 @@ function parsePrice(item) {
 
 // Update statistics summary
 function updateStatistics() {
+    // Prior Sales Statistics
     const totalSales = filteredSalesData.length;
-    const totalListings = filteredListingsData.length;
-
     const salesPrices = filteredSalesData.map(parsePrice).filter(p => p > 0);
-    const listingsPrices = filteredListingsData.map(parsePrice).filter(p => p > 0);
 
     const avgSalePrice = salesPrices.length > 0
         ? salesPrices.reduce((a, b) => a + b, 0) / salesPrices.length
         : 0;
+    const maxSalePrice = salesPrices.length > 0 ? Math.max(...salesPrices) : 0;
+    const minSalePrice = salesPrices.length > 0 ? Math.min(...salesPrices) : 0;
+
+    document.getElementById('totalSales').textContent = totalSales.toLocaleString();
+    document.getElementById('avgSalePrice').textContent = '$' + avgSalePrice.toFixed(2);
+    document.getElementById('maxSalePrice').textContent = '$' + maxSalePrice.toFixed(2);
+    document.getElementById('minSalePrice').textContent = '$' + minSalePrice.toFixed(2);
+    document.getElementById('salesStatsRow').style.display = 'flex';
+
+    // New Listings Statistics
+    const totalListings = filteredListingsData.length;
+    const listingsPrices = filteredListingsData.map(parsePrice).filter(p => p > 0);
 
     const avgAskingPrice = listingsPrices.length > 0
         ? listingsPrices.reduce((a, b) => a + b, 0) / listingsPrices.length
         : 0;
+    const maxAskingPrice = listingsPrices.length > 0 ? Math.max(...listingsPrices) : 0;
+    const minAskingPrice = listingsPrices.length > 0 ? Math.min(...listingsPrices) : 0;
 
-    document.getElementById('totalSales').textContent = totalSales.toLocaleString();
     document.getElementById('totalListings').textContent = totalListings.toLocaleString();
-    document.getElementById('avgSalePrice').textContent = '$' + avgSalePrice.toFixed(2);
     document.getElementById('avgAskingPrice').textContent = '$' + avgAskingPrice.toFixed(2);
-
-    document.getElementById('statsRow').style.display = 'flex';
+    document.getElementById('maxAskingPrice').textContent = '$' + maxAskingPrice.toFixed(2);
+    document.getElementById('minAskingPrice').textContent = '$' + minAskingPrice.toFixed(2);
+    document.getElementById('listingsStatsRow').style.display = 'flex';
 }
 
 // Analyze data by RIR
@@ -645,6 +656,70 @@ function analyzePriceDistribution(data) {
     };
 }
 
+// Analyze average price by block size
+function analyzeAvgPriceByBlockSize(data) {
+    const blockPrices = {};
+
+    data.forEach(item => {
+        const block = item.block || 'Unknown';
+        const price = parsePrice(item);
+        if (price > 0) {
+            if (!blockPrices[block]) {
+                blockPrices[block] = [];
+            }
+            blockPrices[block].push(price);
+        }
+    });
+
+    const sortedBlocks = Object.keys(blockPrices).sort((a, b) => {
+        if (a === 'Unknown') return 1;
+        if (b === 'Unknown') return -1;
+        return parseInt(b) - parseInt(a);
+    });
+
+    const avgPrices = sortedBlocks.map(block => {
+        const prices = blockPrices[block];
+        return prices.reduce((a, b) => a + b, 0) / prices.length;
+    });
+
+    return {
+        labels: sortedBlocks.map(b => `/${b}`),
+        data: avgPrices
+    };
+}
+
+// Analyze price comparison by RIR (for grouped bar chart)
+function analyzePriceByRir(data) {
+    const rirPrices = {
+        arin: [],
+        ripe: [],
+        apnic: [],
+        lacnic: [],
+        afrinic: []
+    };
+
+    data.forEach(item => {
+        const region = (item.region || '').toLowerCase();
+        const price = parsePrice(item);
+        if (rirPrices.hasOwnProperty(region) && price > 0) {
+            rirPrices[region].push(price);
+        }
+    });
+
+    const labels = ['ARIN', 'RIPE', 'APNIC', 'LACNIC', 'AFRINIC'];
+    const avgPrices = ['arin', 'ripe', 'apnic', 'lacnic', 'afrinic'].map(rir => {
+        const prices = rirPrices[rir];
+        return prices.length > 0
+            ? prices.reduce((a, b) => a + b, 0) / prices.length
+            : 0;
+    });
+
+    return {
+        labels: labels,
+        data: avgPrices
+    };
+}
+
 // Analyze price trends over time
 function analyzePriceTrends(data) {
     // Group by date
@@ -683,61 +758,68 @@ function analyzePriceTrends(data) {
     };
 }
 
-// Render all charts
+// Render charts based on active view
 function renderCharts() {
-    // Prior Sales Charts
-    const salesRirData = analyzeByRir(filteredSalesData);
-    const salesBlockData = analyzeByBlockSize(filteredSalesData);
-    const salesPriceDistData = analyzePriceDistribution(filteredSalesData);
-    const salesTrendData = analyzePriceTrends(filteredSalesData);
+    const priorSalesActive = document.getElementById('priorSalesSection').classList.contains('active');
+    const newListingsActive = document.getElementById('newListingsSection').classList.contains('active');
 
-    new SimpleChart('salesByRirChart').drawPieChart(
-        salesRirData.data,
-        salesRirData.labels,
-        salesRirData.colors
-    );
+    if (priorSalesActive) {
+        // Prior Sales Charts
+        const salesRirData = analyzeByRir(filteredSalesData);
+        const salesBlockData = analyzeByBlockSize(filteredSalesData);
+        const salesPriceByBlockData = analyzeAvgPriceByBlockSize(filteredSalesData);
+        const salesTrendData = analyzePriceTrends(filteredSalesData);
 
-    new SimpleChart('salesByBlockChart').drawBarChart(
-        salesBlockData.data,
-        salesBlockData.labels
-    );
+        new SimpleChart('salesByRirChart').drawPieChart(
+            salesRirData.data,
+            salesRirData.labels,
+            salesRirData.colors
+        );
 
-    new SimpleChart('salesPriceDistChart').drawBarChart(
-        salesPriceDistData.data,
-        salesPriceDistData.labels
-    );
+        new SimpleChart('salesByBlockChart').drawBarChart(
+            salesBlockData.data,
+            salesBlockData.labels
+        );
 
-    new SimpleChart('salesTrendChart').drawLineChart(
-        salesTrendData.data,
-        salesTrendData.labels
-    );
+        new SimpleChart('salesPriceByBlockChart').drawBarChart(
+            salesPriceByBlockData.data,
+            salesPriceByBlockData.labels
+        );
 
-    // New Listings Charts
-    const listingsRirData = analyzeByRir(filteredListingsData);
-    const listingsBlockData = analyzeByBlockSize(filteredListingsData);
-    const listingsPriceDistData = analyzePriceDistribution(filteredListingsData);
-    const listingsTrendData = analyzePriceTrends(filteredListingsData);
+        new SimpleChart('salesTrendChart').drawLineChart(
+            salesTrendData.data,
+            salesTrendData.labels
+        );
+    }
 
-    new SimpleChart('listingsByRirChart').drawPieChart(
-        listingsRirData.data,
-        listingsRirData.labels,
-        listingsRirData.colors
-    );
+    if (newListingsActive) {
+        // New Listings Charts
+        const listingsRirData = analyzeByRir(filteredListingsData);
+        const listingsBlockData = analyzeByBlockSize(filteredListingsData);
+        const listingsPriceByBlockData = analyzeAvgPriceByBlockSize(filteredListingsData);
+        const listingsPriceByRirData = analyzePriceByRir(filteredListingsData);
 
-    new SimpleChart('listingsByBlockChart').drawBarChart(
-        listingsBlockData.data,
-        listingsBlockData.labels
-    );
+        new SimpleChart('listingsByRirChart').drawPieChart(
+            listingsRirData.data,
+            listingsRirData.labels,
+            listingsRirData.colors
+        );
 
-    new SimpleChart('listingsPriceDistChart').drawBarChart(
-        listingsPriceDistData.data,
-        listingsPriceDistData.labels
-    );
+        new SimpleChart('listingsByBlockChart').drawBarChart(
+            listingsBlockData.data,
+            listingsBlockData.labels
+        );
 
-    new SimpleChart('listingsTrendChart').drawLineChart(
-        listingsTrendData.data,
-        listingsTrendData.labels
-    );
+        new SimpleChart('listingsPriceByBlockChart').drawBarChart(
+            listingsPriceByBlockData.data,
+            listingsPriceByBlockData.labels
+        );
+
+        new SimpleChart('listingsPriceByRirChart').drawBarChart(
+            listingsPriceByRirData.data,
+            listingsPriceByRirData.labels
+        );
+    }
 }
 
 // Apply filters to data - reload from API with new filters
@@ -789,6 +871,29 @@ async function loadData() {
     }
 }
 
+// Toggle between views
+function toggleView(viewType) {
+    const priorSalesBtn = document.getElementById('viewPriorSales');
+    const newListingsBtn = document.getElementById('viewNewListings');
+    const priorSalesSection = document.getElementById('priorSalesSection');
+    const newListingsSection = document.getElementById('newListingsSection');
+
+    if (viewType === 'priorSales') {
+        priorSalesBtn.classList.add('active');
+        newListingsBtn.classList.remove('active');
+        priorSalesSection.classList.add('active');
+        newListingsSection.classList.remove('active');
+    } else {
+        newListingsBtn.classList.add('active');
+        priorSalesBtn.classList.remove('active');
+        newListingsSection.classList.add('active');
+        priorSalesSection.classList.remove('active');
+    }
+
+    // Re-render charts for the active view
+    renderCharts();
+}
+
 // Initialize the dashboard
 document.addEventListener('DOMContentLoaded', () => {
     initializeDateFilters();
@@ -799,4 +904,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Set up filter button
     document.getElementById('applyFilters').addEventListener('click', applyFilters);
+
+    // Set up view toggle buttons
+    document.getElementById('viewPriorSales').addEventListener('click', () => toggleView('priorSales'));
+    document.getElementById('viewNewListings').addEventListener('click', () => toggleView('newListings'));
 });

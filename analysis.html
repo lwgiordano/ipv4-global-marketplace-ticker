@@ -199,17 +199,54 @@
             font-weight: bold;
         }
         .tooltip {
-            position: absolute;
+            position: fixed;
             background-color: rgba(0, 0, 0, 0.85);
             color: white;
             padding: 8px 12px;
             border-radius: 4px;
             font-size: 12px;
             pointer-events: none;
-            z-index: 1000;
+            z-index: 10000;
             white-space: nowrap;
             box-shadow: 0 2px 8px rgba(0,0,0,0.3);
             display: none;
+        }
+        .view-toggle {
+            display: flex;
+            justify-content: center;
+            gap: 0;
+            margin-bottom: 30px;
+            background-color: #f0f0f0;
+            border-radius: 8px;
+            padding: 4px;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .view-toggle button {
+            padding: 12px 30px;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: #666;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .view-toggle button.active {
+            background: linear-gradient(135deg, #005398 0%, #0066b8 100%);
+            color: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .view-toggle button:hover:not(.active) {
+            background-color: #e0e0e0;
+            color: #333;
+        }
+        .view-section {
+            display: none;
+        }
+        .view-section.active {
+            display: block;
         }
         .description {
             font-size: 0.85em;
@@ -262,65 +299,93 @@
         <div id="loadingMessage" class="loading" style="display: none;">Loading data...</div>
         <div id="errorMessage" class="error" style="display: none;"></div>
 
-        <!-- Statistics Summary -->
-        <div class="stats-row" id="statsRow" style="display: none;">
-            <div class="stat-box">
-                <div class="stat-label">Total Prior Sales</div>
-                <div class="stat-value" id="totalSales">-</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-label">Total New Listings</div>
-                <div class="stat-value" id="totalListings">-</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-label">Avg Sale Price</div>
-                <div class="stat-value" id="avgSalePrice">-</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-label">Avg Asking Price</div>
-                <div class="stat-value" id="avgAskingPrice">-</div>
-            </div>
+        <!-- View Toggle -->
+        <div class="view-toggle">
+            <button id="viewPriorSales" class="active">Prior Sales</button>
+            <button id="viewNewListings">New Listings</button>
         </div>
 
         <!-- Prior Sales Section -->
-        <h2>Prior Sales Analysis</h2>
-        <div class="charts-grid">
-            <div class="chart-container">
-                <div class="chart-title">Price Trends Over Time</div>
-                <canvas id="salesTrendChart"></canvas>
+        <div id="priorSalesSection" class="view-section active">
+            <div class="stats-row" id="salesStatsRow" style="display: none;">
+                <div class="stat-box">
+                    <div class="stat-label">Total Sales</div>
+                    <div class="stat-value" id="totalSales">-</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Avg Sale Price</div>
+                    <div class="stat-value" id="avgSalePrice">-</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Highest Sale</div>
+                    <div class="stat-value" id="maxSalePrice">-</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Lowest Sale</div>
+                    <div class="stat-value" id="minSalePrice">-</div>
+                </div>
             </div>
-            <div class="chart-container">
-                <div class="chart-title">Sales by RIR</div>
-                <canvas id="salesByRirChart"></canvas>
-            </div>
-            <div class="chart-container">
-                <div class="chart-title">Sales by Block Size</div>
-                <canvas id="salesByBlockChart"></canvas>
-            </div>
-            <div class="chart-container">
-                <div class="chart-title">Price Distribution</div>
-                <canvas id="salesPriceDistChart"></canvas>
+
+            <h2>Prior Sales Analysis</h2>
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <div class="chart-title">Price Trends Over Time</div>
+                    <canvas id="salesTrendChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">Sales Volume by RIR</div>
+                    <canvas id="salesByRirChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">Sales Volume by Block Size</div>
+                    <canvas id="salesByBlockChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">Average Price by Block Size</div>
+                    <canvas id="salesPriceByBlockChart"></canvas>
+                </div>
             </div>
         </div>
 
         <!-- New Listings Section -->
-        <h2>New Listings Analysis</h2>
-        <div class="charts-grid">
-            <div class="chart-container">
-                <div class="chart-title">Asking Price Trends</div>
-                <canvas id="listingsTrendChart"></canvas>
+        <div id="newListingsSection" class="view-section">
+            <div class="stats-row" id="listingsStatsRow" style="display: none;">
+                <div class="stat-box">
+                    <div class="stat-label">Total Listings</div>
+                    <div class="stat-value" id="totalListings">-</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Avg Asking Price</div>
+                    <div class="stat-value" id="avgAskingPrice">-</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Highest Asking</div>
+                    <div class="stat-value" id="maxAskingPrice">-</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Lowest Asking</div>
+                    <div class="stat-value" id="minAskingPrice">-</div>
+                </div>
             </div>
-            <div class="chart-container">
-                <div class="chart-title">Listings by RIR</div>
-                <canvas id="listingsByRirChart"></canvas>
-            </div>
-            <div class="chart-container">
-                <div class="chart-title">Listings by Block Size</div>
-                <canvas id="listingsByBlockChart"></canvas>
-            </div>
-            <div class="chart-container">
-                <div class="chart-title">Asking Price Distribution</div>
-                <canvas id="listingsPriceDistChart"></canvas>
+
+            <h2>New Listings Analysis</h2>
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <div class="chart-title">Asking Prices by Block Size</div>
+                    <canvas id="listingsPriceByBlockChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">Available Inventory by RIR</div>
+                    <canvas id="listingsByRirChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">Available Inventory by Block Size</div>
+                    <canvas id="listingsByBlockChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">Price Comparison by RIR</div>
+                    <canvas id="listingsPriceByRirChart"></canvas>
+                </div>
             </div>
         </div>
 
