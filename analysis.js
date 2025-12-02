@@ -52,12 +52,15 @@ class SimpleChart {
         const isPieChart = this.canvasId.includes('ByRir');
 
         // Set display size (CSS pixels) with proper aspect ratio
-        const displayWidth = containerWidth;
+        let displayWidth = containerWidth;
         let displayHeight;
 
         if (isPieChart) {
             // Pie charts need square canvas for perfect circles
-            displayHeight = displayWidth;
+            // Limit max size to 450px for better proportions
+            const maxPieSize = Math.min(450, containerWidth);
+            displayWidth = maxPieSize;
+            displayHeight = maxPieSize;
         } else {
             // Other charts use 0.6 aspect ratio
             displayHeight = Math.min(400, Math.max(280, containerWidth * 0.6));

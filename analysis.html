@@ -123,15 +123,19 @@
             flex: 1;
             min-width: 160px;
         }
-        .filter-group.view-selector {
-            flex: 0 0 100%;
-            min-width: auto;
-            max-width: 280px;
-            order: 999;
+
+        .view-selector {
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
 
-        .filter-group.view-selector label {
-            margin-bottom: 8px;
+        .view-selector label {
+            font-weight: 600;
+            color: #424647;
+            font-size: 14px;
+            margin: 0;
         }
         label {
             display: block;
@@ -370,8 +374,7 @@
             padding: 4px;
             position: relative;
             isolation: isolate;
-            width: 100%;
-            min-width: 260px;
+            min-width: 280px;
         }
 
         .view-toggle::before {
@@ -514,9 +517,10 @@
                 min-width: 100%;
             }
 
-            .filter-group.view-selector {
-                width: 100%;
-                max-width: 100%;
+            .view-selector {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
             }
 
             .view-toggle {
@@ -658,15 +662,15 @@
                 <div class="filter-group">
                     <button id="applyFilters">Apply Filters</button>
                 </div>
-                <div class="filter-group view-selector">
-                    <label>View:</label>
-                    <div class="view-toggle">
-                        <button id="viewPriorSales" class="active">Prior Sales</button>
-                        <button id="viewCurrentListings">Current Listings</button>
-                    </div>
-                </div>
             </div>
             <p class="description">Filter the dashboard data by date range, block size, and Regional Internet Registry (RIR).</p>
+            <div class="view-selector">
+                <label>View:</label>
+                <div class="view-toggle">
+                    <button id="viewPriorSales" class="active">Prior Sales</button>
+                    <button id="viewCurrentListings">Current Listings</button>
+                </div>
+            </div>
         </div>
 
         <!-- Loading/Error Messages -->
