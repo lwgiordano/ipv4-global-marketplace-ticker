@@ -13,13 +13,13 @@ let filteredListingsData = [];
 
 // Modern color scheme
 const COLORS = {
-    primary: '#667eea',
-    secondary: '#764ba2',
-    arin: '#f093fb',
-    ripe: '#4facfe',
-    apnic: '#feca57',
-    lacnic: '#48dbfb',
-    afrinic: '#a29bfe',
+    primary: '#0066cc',
+    secondary: '#0052a3',
+    arin: '#3399ff',
+    ripe: '#0088cc',
+    apnic: '#66b3ff',
+    lacnic: '#0066aa',
+    afrinic: '#99ccff',
     grid: '#e2e8f0',
     text: '#2c3e50'
 };
@@ -137,12 +137,8 @@ class SimpleChart {
                 const x = this.padding.left + index * barSpacing + (barSpacing - barWidth) / 2;
                 const y = this.height - this.padding.bottom - barHeight;
 
-                // Create gradient for bars
-                const gradient = this.ctx.createLinearGradient(x, y, x, y + barHeight);
-                gradient.addColorStop(0, COLORS.primary);
-                gradient.addColorStop(1, COLORS.secondary);
-
-                this.ctx.fillStyle = gradient;
+                // Solid color for bars
+                this.ctx.fillStyle = COLORS.primary;
                 this.ctx.fillRect(x, y, barWidth, barHeight);
 
                 // Add to data points for tooltip
@@ -325,13 +321,10 @@ class SimpleChart {
             }
             this.ctx.stroke();
 
-            // Draw area under line with gradient
+            // Draw area under line with solid color
             if (pointsToDraw > 0) {
                 this.ctx.save();
-                const gradient = this.ctx.createLinearGradient(0, this.padding.top, 0, this.height - this.padding.bottom);
-                gradient.addColorStop(0, 'rgba(0, 83, 152, 0.2)');
-                gradient.addColorStop(1, 'rgba(0, 83, 152, 0)');
-                this.ctx.fillStyle = gradient;
+                this.ctx.fillStyle = 'rgba(0, 102, 204, 0.1)';
 
                 this.ctx.beginPath();
                 this.ctx.moveTo(this.padding.left, this.height - this.padding.bottom);

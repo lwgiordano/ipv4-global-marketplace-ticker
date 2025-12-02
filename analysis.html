@@ -13,7 +13,7 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            background: #f0f4f8;
             color: #2c3e50;
             min-height: 100vh;
             padding: 40px 20px;
@@ -22,18 +22,14 @@
         .container {
             max-width: 1400px;
             margin: 0 auto;
-            background-color: rgba(255, 255, 255, 0.95);
+            background-color: #ffffff;
             padding: 40px;
             border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0, 102, 204, 0.08);
         }
 
         h1 {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: #0066cc;
             text-align: center;
             margin-bottom: 40px;
             font-size: 36px;
@@ -42,22 +38,20 @@
         }
 
         h2 {
-            color: #2c3e50;
+            color: #0066cc;
             font-size: 22px;
             font-weight: 600;
             margin-top: 50px;
             margin-bottom: 25px;
             padding-bottom: 12px;
-            border-bottom: 3px solid transparent;
-            border-image: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            border-image-slice: 1;
+            border-bottom: 3px solid #0066cc;
         }
         .filters {
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(249, 250, 251, 0.9) 100%);
+            background: #ffffff;
             padding: 30px;
             border-radius: 16px;
             margin-bottom: 40px;
-            border: 1px solid rgba(102, 126, 234, 0.1);
+            border: 1px solid rgba(0, 102, 204, 0.1);
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
         }
         .filter-row {
@@ -65,6 +59,7 @@
             gap: 20px;
             flex-wrap: wrap;
             align-items: flex-end;
+            justify-content: space-between;
         }
         .filter-group {
             flex: 1;
@@ -92,12 +87,12 @@
         }
         select:focus, input[type="date"]:focus {
             outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            border-color: #0066cc;
+            box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
         }
         button {
             padding: 12px 24px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #0066cc;
             color: white;
             border: none;
             border-radius: 10px;
@@ -105,11 +100,12 @@
             font-size: 14px;
             font-weight: 600;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 4px 15px rgba(0, 102, 204, 0.3);
         }
         button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 6px 20px rgba(0, 102, 204, 0.4);
+            background: #0052a3;
         }
         button:active {
             transform: translateY(0);
@@ -124,7 +120,7 @@
             background: white;
             padding: 25px;
             border-radius: 16px;
-            border: 1px solid rgba(102, 126, 234, 0.1);
+            border: 1px solid rgba(0, 102, 204, 0.1);
             opacity: 0;
             transform: translateY(30px);
             animation: fadeInUp 0.6s ease-out forwards;
@@ -135,8 +131,8 @@
         }
         .chart-container:hover {
             transform: translateY(-8px);
-            box-shadow: 0 12px 40px rgba(102, 126, 234, 0.15);
-            border-color: rgba(102, 126, 234, 0.3);
+            box-shadow: 0 12px 40px rgba(0, 102, 204, 0.15);
+            border-color: rgba(0, 102, 204, 0.3);
         }
         .chart-container:nth-child(1) { animation-delay: 0.1s; }
         .chart-container:nth-child(2) { animation-delay: 0.2s; }
@@ -160,7 +156,7 @@
             transform: translateX(-50%);
             width: 40px;
             height: 3px;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            background: #0066cc;
             border-radius: 2px;
         }
         canvas {
@@ -218,11 +214,11 @@
         .stat-box {
             flex: 1;
             min-width: 200px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #0066cc;
             color: white;
             padding: 24px;
             border-radius: 16px;
-            box-shadow: 0 8px 30px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 8px 30px rgba(0, 102, 204, 0.3);
             opacity: 0;
             animation: countUp 0.5s ease-out forwards;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -236,12 +232,13 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%);
+            background: rgba(255,255,255,0.05);
             pointer-events: none;
         }
         .stat-box:hover {
             transform: translateY(-5px) scale(1.03);
-            box-shadow: 0 12px 40px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 12px 40px rgba(0, 102, 204, 0.4);
+            background: #0052a3;
         }
         .stat-box:nth-child(1) { animation-delay: 0.1s; }
         .stat-box:nth-child(2) { animation-delay: 0.2s; }
@@ -279,38 +276,37 @@
         }
         .view-toggle {
             display: flex;
-            justify-content: center;
             gap: 8px;
-            margin-bottom: 40px;
-            background: rgba(102, 126, 234, 0.08);
-            border-radius: 14px;
-            padding: 6px;
-            width: fit-content;
-            margin-left: auto;
-            margin-right: auto;
+            background: rgba(0, 102, 204, 0.08);
+            border-radius: 10px;
+            padding: 4px;
             box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
         }
         .view-toggle button {
-            padding: 12px 32px;
-            border-radius: 10px;
+            padding: 10px 20px;
+            border-radius: 8px;
             border: none;
             background: transparent;
             color: #64748b;
             cursor: pointer;
             font-weight: 600;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            font-size: 14px;
+            font-size: 13px;
             position: relative;
+            white-space: nowrap;
+            box-shadow: none;
         }
         .view-toggle button.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #0066cc;
             color: white;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 102, 204, 0.3);
         }
         .view-toggle button:hover:not(.active) {
-            background-color: rgba(102, 126, 234, 0.1);
-            color: #667eea;
+            background-color: rgba(0, 102, 204, 0.1);
+            color: #0066cc;
+        }
+        .view-toggle button:active {
+            transform: none;
         }
         .view-section {
             display: none;
@@ -361,6 +357,13 @@
                 <div class="filter-group">
                     <button id="applyFilters">Apply Filters</button>
                 </div>
+                <div class="filter-group">
+                    <label>View:</label>
+                    <div class="view-toggle">
+                        <button id="viewPriorSales" class="active">Prior Sales</button>
+                        <button id="viewNewListings">New Listings</button>
+                    </div>
+                </div>
             </div>
             <p class="description">Filter the dashboard data by date range, block size, and Regional Internet Registry (RIR).</p>
         </div>
@@ -368,12 +371,6 @@
         <!-- Loading/Error Messages -->
         <div id="loadingMessage" class="loading" style="display: none;">Loading data...</div>
         <div id="errorMessage" class="error" style="display: none;"></div>
-
-        <!-- View Toggle -->
-        <div class="view-toggle">
-            <button id="viewPriorSales" class="active">Prior Sales</button>
-            <button id="viewNewListings">New Listings</button>
-        </div>
 
         <!-- Prior Sales Section -->
         <div id="priorSalesSection" class="view-section active">
