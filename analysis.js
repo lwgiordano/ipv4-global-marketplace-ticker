@@ -313,45 +313,78 @@ function initializeBlockSizeFilter() {
     }
 }
 
-// Fetch data from API
+// Fetch a single page of data from API
+async function fetchPage(endpoint, requestBody) {
+    const response = await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({
+            type: 'fetchData',
+            url: endpoint,
+            body: JSON.stringify(requestBody)
+        }, (response) => {
+            if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+            } else if (response.success) {
+                resolve(response);
+            } else {
+                reject(new Error(response.error || 'Unknown error'));
+            }
+        });
+    });
+
+    const data = JSON.parse(response.data);
+    return data.items || [];
+}
+
+// Fetch all data from API using pagination
 async function fetchData(endpoint, filters) {
-    const requestBody = {
+    const allItems = [];
+    const pageSize = 250; // Maximum allowed by API (min: 25, max: 250)
+    let offset = 0;
+    let hasMore = true;
+
+    const baseRequestBody = {
         filter: {
             block: filters.blockSize ? [parseInt(filters.blockSize)] : [24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8],
             region: filters.rir ? [filters.rir] : ['arin', 'apnic', 'ripe', 'afrinic', 'lacnic']
         },
-        sort: { property: 'date', direction: 'desc' },
-        offset: 0,
-        limit: 250 // Maximum allowed by API (min: 25, max: 250)
+        sort: { property: 'date', direction: 'desc' }
     };
 
     // Add date range for prior sales (always required for this endpoint)
     if (endpoint === PRIOR_SALES_ENDPOINT) {
-        requestBody.filter.period = {
+        baseRequestBody.filter.period = {
             from: filters.dateFrom || getStartOfCurrentYear(),
             to: filters.dateTo || getTomorrowDate()
         };
     }
 
     try {
-        const response = await new Promise((resolve, reject) => {
-            chrome.runtime.sendMessage({
-                type: 'fetchData',
-                url: endpoint,
-                body: JSON.stringify(requestBody)
-            }, (response) => {
-                if (chrome.runtime.lastError) {
-                    reject(new Error(chrome.runtime.lastError.message));
-                } else if (response.success) {
-                    resolve(response);
-                } else {
-                    reject(new Error(response.error || 'Unknown error'));
-                }
-            });
-        });
+        // Fetch all pages using pagination
+        while (hasMore) {
+            const requestBody = {
+                ...baseRequestBody,
+                offset: offset,
+                limit: pageSize
+            };
 
-        const data = JSON.parse(response.data);
-        return data.items || [];
+            console.log(`Fetching page: offset=${offset}, limit=${pageSize}`);
+            const items = await fetchPage(endpoint, requestBody);
+
+            if (items.length > 0) {
+                allItems.push(...items);
+                console.log(`Received ${items.length} items (total so far: ${allItems.length})`);
+            }
+
+            // If we received fewer items than the page size, we've reached the end
+            if (items.length < pageSize) {
+                hasMore = false;
+                console.log(`Pagination complete. Total items: ${allItems.length}`);
+            } else {
+                offset += pageSize;
+            }
+        }
+
+        return allItems;
     } catch (error) {
         console.error(`Error fetching data from ${endpoint}:`, error);
         throw error;
@@ -624,19 +657,21 @@ async function loadData() {
 
         const filters = { dateFrom, dateTo, blockSize, rir };
 
-        // Fetch both datasets in parallel
-        const [salesData, listingsData] = await Promise.all([
-            fetchData(PRIOR_SALES_ENDPOINT, filters),
-            fetchData(NEW_LISTINGS_ENDPOINT, filters)
-        ]);
+        // Fetch prior sales data
+        loadingMessage.textContent = 'Loading prior sales data...';
+        priorSalesData = await fetchData(PRIOR_SALES_ENDPOINT, filters);
+        console.log(`Loaded ${priorSalesData.length} prior sales records`);
 
-        priorSalesData = salesData;
-        newListingsData = listingsData;
+        // Fetch new listings data
+        loadingMessage.textContent = 'Loading new listings data...';
+        newListingsData = await fetchData(NEW_LISTINGS_ENDPOINT, filters);
+        console.log(`Loaded ${newListingsData.length} new listings records`);
 
         // Initial filter application (will use all data initially)
         filteredSalesData = priorSalesData;
         filteredListingsData = newListingsData;
 
+        loadingMessage.textContent = 'Rendering charts...';
         updateStatistics();
         renderCharts();
 
