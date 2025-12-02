@@ -273,13 +273,33 @@ class SimpleChart {
     }
 }
 
+// Helper functions for date formatting
+function formatDate(date) {
+    const y = date.getFullYear();
+    let m = date.getMonth() + 1;
+    let d = date.getDate();
+    if (m < 10) m = '0' + m;
+    if (d < 10) d = '0' + d;
+    return `${y}-${m}-${d}`;
+}
+
+function getStartOfCurrentYear() {
+    return `${new Date().getFullYear()}-01-01`;
+}
+
+function getTomorrowDate() {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return formatDate(tomorrow);
+}
+
 // Initialize date filters to current year
 function initializeDateFilters() {
     const now = new Date();
     const yearStart = new Date(now.getFullYear(), 0, 1);
 
-    document.getElementById('dateFrom').valueAsDate = yearStart;
-    document.getElementById('dateTo').valueAsDate = now;
+    document.getElementById('dateFrom').value = formatDate(yearStart);
+    document.getElementById('dateTo').value = formatDate(now);
 }
 
 // Initialize block size filter options
@@ -298,18 +318,18 @@ async function fetchData(endpoint, filters) {
     const requestBody = {
         filter: {
             block: filters.blockSize ? [parseInt(filters.blockSize)] : [24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8],
-            region: filters.rir ? [filters.rir] : ['arin', 'ripe', 'apnic', 'lacnic', 'afrinic']
+            region: filters.rir ? [filters.rir] : ['arin', 'apnic', 'ripe', 'afrinic', 'lacnic']
         },
         sort: { property: 'date', direction: 'desc' },
         offset: 0,
         limit: 1000 // Get more data for analysis
     };
 
-    // Add date range for prior sales
-    if (endpoint === PRIOR_SALES_ENDPOINT && filters.dateFrom && filters.dateTo) {
+    // Add date range for prior sales (always required for this endpoint)
+    if (endpoint === PRIOR_SALES_ENDPOINT) {
         requestBody.filter.period = {
-            from: filters.dateFrom,
-            to: filters.dateTo
+            from: filters.dateFrom || getStartOfCurrentYear(),
+            to: filters.dateTo || getTomorrowDate()
         };
     }
 
