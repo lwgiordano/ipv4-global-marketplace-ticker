@@ -94,7 +94,21 @@
             padding: 20px;
             border-radius: 6px;
             border: 1px solid #e0e0e0;
+            opacity: 0;
+            transform: translateY(30px);
+            animation: fadeInUp 0.6s ease-out forwards;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
+        .chart-container:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        .chart-container:nth-child(1) { animation-delay: 0.1s; }
+        .chart-container:nth-child(2) { animation-delay: 0.2s; }
+        .chart-container:nth-child(3) { animation-delay: 0.3s; }
+        .chart-container:nth-child(4) { animation-delay: 0.4s; }
         .chart-title {
             font-size: 16px;
             font-weight: bold;
@@ -106,6 +120,32 @@
             width: 100% !important;
             height: 300px !important;
             display: block;
+            cursor: crosshair;
+        }
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        @keyframes slideIn {
+            from {
+                transform: scaleX(0);
+                transform-origin: left;
+            }
+            to {
+                transform: scaleX(1);
+            }
+        }
+        @keyframes countUp {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
         }
         .loading {
             text-align: center;
@@ -135,7 +175,18 @@
             padding: 20px;
             border-radius: 6px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            opacity: 0;
+            animation: countUp 0.5s ease-out forwards;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
+        .stat-box:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+        }
+        .stat-box:nth-child(1) { animation-delay: 0.1s; }
+        .stat-box:nth-child(2) { animation-delay: 0.2s; }
+        .stat-box:nth-child(3) { animation-delay: 0.3s; }
+        .stat-box:nth-child(4) { animation-delay: 0.4s; }
         .stat-label {
             font-size: 12px;
             opacity: 0.9;
@@ -146,6 +197,19 @@
         .stat-value {
             font-size: 28px;
             font-weight: bold;
+        }
+        .tooltip {
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1000;
+            white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            display: none;
         }
         .description {
             font-size: 0.85em;
@@ -259,6 +323,9 @@
                 <canvas id="listingsPriceDistChart"></canvas>
             </div>
         </div>
+
+        <!-- Tooltip for chart interactivity -->
+        <div id="chartTooltip" class="tooltip"></div>
     </div>
 
     <script src="analysis.js"></script>

@@ -32,15 +32,69 @@ class SimpleChart {
         this.width = this.canvas.width = this.canvas.offsetWidth;
         this.height = this.canvas.height = this.canvas.offsetHeight;
         this.padding = { top: 40, right: 30, bottom: 60, left: 70 };
+        this.tooltip = document.getElementById('chartTooltip');
+        this.dataPoints = [];
+        this.animationProgress = 0;
+
+        // Add mouse event listeners for tooltip
+        this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+        this.canvas.addEventListener('mouseleave', () => this.hideTooltip());
     }
 
     clear() {
         this.ctx.clearRect(0, 0, this.width, this.height);
+        this.dataPoints = [];
+    }
+
+    handleMouseMove(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // Check if mouse is over any data point
+        for (const point of this.dataPoints) {
+            const distance = Math.sqrt(Math.pow(x - point.x, 2) + Math.pow(y - point.y, 2));
+            if (distance < (point.radius || 10)) {
+                this.showTooltip(point, e.clientX, e.clientY);
+                return;
+            }
+        }
+        this.hideTooltip();
+    }
+
+    showTooltip(point, clientX, clientY) {
+        this.tooltip.innerHTML = point.label;
+        this.tooltip.style.display = 'block';
+        this.tooltip.style.left = (clientX + 10) + 'px';
+        this.tooltip.style.top = (clientY - 30) + 'px';
+    }
+
+    hideTooltip() {
+        this.tooltip.style.display = 'none';
+    }
+
+    animate(drawCallback, duration = 800) {
+        const startTime = Date.now();
+        const animateFrame = () => {
+            const elapsed = Date.now() - startTime;
+            this.animationProgress = Math.min(elapsed / duration, 1);
+
+            // Easing function for smooth animation
+            const easeProgress = 1 - Math.pow(1 - this.animationProgress, 3);
+
+            this.clear();
+            drawCallback(easeProgress);
+
+            if (this.animationProgress < 1) {
+                requestAnimationFrame(animateFrame);
+            }
+        };
+        requestAnimationFrame(animateFrame);
     }
 
     drawBarChart(data, labels, title) {
-        this.clear();
         if (!data || data.length === 0) {
+            this.clear();
             this.drawNoData();
             return;
         }
@@ -51,65 +105,82 @@ class SimpleChart {
         const barWidth = chartWidth / data.length * 0.7;
         const barSpacing = chartWidth / data.length;
 
-        // Draw axes
-        this.ctx.strokeStyle = COLORS.grid;
-        this.ctx.lineWidth = 1;
-        this.ctx.beginPath();
-        this.ctx.moveTo(this.padding.left, this.padding.top);
-        this.ctx.lineTo(this.padding.left, this.height - this.padding.bottom);
-        this.ctx.lineTo(this.width - this.padding.right, this.height - this.padding.bottom);
-        this.ctx.stroke();
-
-        // Draw horizontal grid lines
-        const numGridLines = 5;
-        this.ctx.strokeStyle = '#f0f0f0';
-        this.ctx.fillStyle = COLORS.text;
-        this.ctx.font = '11px Arial';
-        for (let i = 0; i <= numGridLines; i++) {
-            const y = this.padding.top + (chartHeight / numGridLines) * i;
-            const value = maxValue * (1 - i / numGridLines);
+        this.animate((progress) => {
+            // Draw axes
+            this.ctx.strokeStyle = COLORS.grid;
+            this.ctx.lineWidth = 1;
             this.ctx.beginPath();
-            this.ctx.moveTo(this.padding.left, y);
-            this.ctx.lineTo(this.width - this.padding.right, y);
+            this.ctx.moveTo(this.padding.left, this.padding.top);
+            this.ctx.lineTo(this.padding.left, this.height - this.padding.bottom);
+            this.ctx.lineTo(this.width - this.padding.right, this.height - this.padding.bottom);
             this.ctx.stroke();
-            this.ctx.fillText(Math.round(value), this.padding.left - 60, y + 4);
-        }
 
-        // Draw bars
-        data.forEach((value, index) => {
-            const barHeight = (value / maxValue) * chartHeight;
-            const x = this.padding.left + index * barSpacing + (barSpacing - barWidth) / 2;
-            const y = this.height - this.padding.bottom - barHeight;
-
-            // Create gradient for bars
-            const gradient = this.ctx.createLinearGradient(x, y, x, y + barHeight);
-            gradient.addColorStop(0, COLORS.primary);
-            gradient.addColorStop(1, COLORS.secondary);
-
-            this.ctx.fillStyle = gradient;
-            this.ctx.fillRect(x, y, barWidth, barHeight);
-
-            // Draw value on top of bar
+            // Draw horizontal grid lines
+            const numGridLines = 5;
+            this.ctx.strokeStyle = '#f0f0f0';
             this.ctx.fillStyle = COLORS.text;
-            this.ctx.font = 'bold 11px Arial';
-            this.ctx.textAlign = 'center';
-            this.ctx.fillText(value, x + barWidth / 2, y - 5);
-        });
+            this.ctx.font = '11px Arial';
+            for (let i = 0; i <= numGridLines; i++) {
+                const y = this.padding.top + (chartHeight / numGridLines) * i;
+                const value = maxValue * (1 - i / numGridLines);
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.padding.left, y);
+                this.ctx.lineTo(this.width - this.padding.right, y);
+                this.ctx.stroke();
+                this.ctx.fillText(Math.round(value), this.padding.left - 60, y + 4);
+            }
 
-        // Draw labels
-        this.ctx.fillStyle = COLORS.text;
-        this.ctx.font = '12px Arial';
-        this.ctx.textAlign = 'center';
-        labels.forEach((label, index) => {
-            const x = this.padding.left + index * barSpacing + barSpacing / 2;
-            const y = this.height - this.padding.bottom + 20;
-            this.ctx.fillText(label, x, y);
+            // Draw bars with animation
+            data.forEach((value, index) => {
+                const animatedHeight = (value / maxValue) * chartHeight * progress;
+                const barHeight = animatedHeight;
+                const x = this.padding.left + index * barSpacing + (barSpacing - barWidth) / 2;
+                const y = this.height - this.padding.bottom - barHeight;
+
+                // Create gradient for bars
+                const gradient = this.ctx.createLinearGradient(x, y, x, y + barHeight);
+                gradient.addColorStop(0, COLORS.primary);
+                gradient.addColorStop(1, COLORS.secondary);
+
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(x, y, barWidth, barHeight);
+
+                // Add to data points for tooltip
+                if (progress === 1) {
+                    this.dataPoints.push({
+                        x: x + barWidth / 2,
+                        y: y,
+                        radius: barWidth / 2,
+                        label: `${labels[index]}: ${value}`
+                    });
+                }
+
+                // Draw value on top of bar (only when fully animated)
+                if (progress > 0.7) {
+                    this.ctx.fillStyle = COLORS.text;
+                    this.ctx.font = 'bold 11px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.globalAlpha = (progress - 0.7) / 0.3;
+                    this.ctx.fillText(value, x + barWidth / 2, y - 5);
+                    this.ctx.globalAlpha = 1;
+                }
+            });
+
+            // Draw labels
+            this.ctx.fillStyle = COLORS.text;
+            this.ctx.font = '12px Arial';
+            this.ctx.textAlign = 'center';
+            labels.forEach((label, index) => {
+                const x = this.padding.left + index * barSpacing + barSpacing / 2;
+                const y = this.height - this.padding.bottom + 20;
+                this.ctx.fillText(label, x, y);
+            });
         });
     }
 
     drawPieChart(data, labels, colors) {
-        this.clear();
         if (!data || data.length === 0 || data.every(v => v === 0)) {
+            this.clear();
             this.drawNoData();
             return;
         }
@@ -119,64 +190,82 @@ class SimpleChart {
         const radius = Math.min(this.width, this.height) / 2 - 80;
         const total = data.reduce((sum, val) => sum + val, 0);
 
-        let currentAngle = -Math.PI / 2; // Start at top
+        this.animate((progress) => {
+            const animatedRadius = radius * progress;
+            let currentAngle = -Math.PI / 2; // Start at top
 
-        data.forEach((value, index) => {
-            const sliceAngle = (value / total) * 2 * Math.PI;
+            data.forEach((value, index) => {
+                const sliceAngle = (value / total) * 2 * Math.PI;
 
-            // Draw slice
-            this.ctx.fillStyle = colors[index] || this.getColor(index);
-            this.ctx.beginPath();
-            this.ctx.moveTo(centerX, centerY);
-            this.ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
-            this.ctx.closePath();
-            this.ctx.fill();
+                // Draw slice
+                this.ctx.fillStyle = colors[index] || this.getColor(index);
+                this.ctx.beginPath();
+                this.ctx.moveTo(centerX, centerY);
+                this.ctx.arc(centerX, centerY, animatedRadius, currentAngle, currentAngle + sliceAngle);
+                this.ctx.closePath();
+                this.ctx.fill();
 
-            // Draw border
-            this.ctx.strokeStyle = 'white';
-            this.ctx.lineWidth = 2;
-            this.ctx.stroke();
+                // Draw border
+                this.ctx.strokeStyle = 'white';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
 
-            // Draw percentage label
-            const percentage = ((value / total) * 100).toFixed(1);
-            if (percentage > 5) { // Only show if slice is large enough
-                const labelAngle = currentAngle + sliceAngle / 2;
-                const labelX = centerX + Math.cos(labelAngle) * (radius * 0.7);
-                const labelY = centerY + Math.sin(labelAngle) * (radius * 0.7);
+                // Add to data points for tooltip
+                if (progress === 1) {
+                    const midAngle = currentAngle + sliceAngle / 2;
+                    this.dataPoints.push({
+                        x: centerX + Math.cos(midAngle) * (radius * 0.7),
+                        y: centerY + Math.sin(midAngle) * (radius * 0.7),
+                        radius: 20,
+                        label: `${labels[index]}: ${value} (${((value/total)*100).toFixed(1)}%)`
+                    });
+                }
 
-                this.ctx.fillStyle = 'white';
-                this.ctx.font = 'bold 12px Arial';
-                this.ctx.textAlign = 'center';
-                this.ctx.textBaseline = 'middle';
-                this.ctx.fillText(`${percentage}%`, labelX, labelY);
-            }
+                // Draw percentage label (only when fully animated)
+                if (progress > 0.8) {
+                    const percentage = ((value / total) * 100).toFixed(1);
+                    if (percentage > 5) {
+                        const labelAngle = currentAngle + sliceAngle / 2;
+                        const labelX = centerX + Math.cos(labelAngle) * (animatedRadius * 0.7);
+                        const labelY = centerY + Math.sin(labelAngle) * (animatedRadius * 0.7);
 
-            currentAngle += sliceAngle;
-        });
+                        this.ctx.fillStyle = 'white';
+                        this.ctx.font = 'bold 12px Arial';
+                        this.ctx.textAlign = 'center';
+                        this.ctx.textBaseline = 'middle';
+                        this.ctx.globalAlpha = (progress - 0.8) / 0.2;
+                        this.ctx.fillText(`${percentage}%`, labelX, labelY);
+                        this.ctx.globalAlpha = 1;
+                    }
+                }
 
-        // Draw legend
-        const legendX = 20;
-        let legendY = this.height - this.padding.bottom - (labels.length * 25);
+                currentAngle += sliceAngle;
+            });
 
-        labels.forEach((label, index) => {
-            // Color box
-            this.ctx.fillStyle = colors[index] || this.getColor(index);
-            this.ctx.fillRect(legendX, legendY, 15, 15);
+            // Draw legend
+            const legendX = 20;
+            let legendY = this.height - this.padding.bottom - (labels.length * 25);
 
-            // Label text
-            this.ctx.fillStyle = COLORS.text;
-            this.ctx.font = '12px Arial';
-            this.ctx.textAlign = 'left';
-            this.ctx.textBaseline = 'top';
-            this.ctx.fillText(`${label} (${data[index]})`, legendX + 20, legendY);
+            labels.forEach((label, index) => {
+                // Color box
+                this.ctx.fillStyle = colors[index] || this.getColor(index);
+                this.ctx.fillRect(legendX, legendY, 15, 15);
 
-            legendY += 25;
+                // Label text
+                this.ctx.fillStyle = COLORS.text;
+                this.ctx.font = '12px Arial';
+                this.ctx.textAlign = 'left';
+                this.ctx.textBaseline = 'top';
+                this.ctx.fillText(`${label} (${data[index]})`, legendX + 20, legendY);
+
+                legendY += 25;
+            });
         });
     }
 
     drawLineChart(data, labels, title) {
-        this.clear();
         if (!data || data.length === 0) {
+            this.clear();
             this.drawNoData();
             return;
         }
@@ -186,76 +275,123 @@ class SimpleChart {
         const maxValue = Math.max(...data, 1);
         const minValue = Math.min(...data, 0);
         const valueRange = maxValue - minValue || 1;
-
-        // Draw axes
-        this.ctx.strokeStyle = COLORS.grid;
-        this.ctx.lineWidth = 1;
-        this.ctx.beginPath();
-        this.ctx.moveTo(this.padding.left, this.padding.top);
-        this.ctx.lineTo(this.padding.left, this.height - this.padding.bottom);
-        this.ctx.lineTo(this.width - this.padding.right, this.height - this.padding.bottom);
-        this.ctx.stroke();
-
-        // Draw horizontal grid lines
-        const numGridLines = 5;
-        this.ctx.strokeStyle = '#f0f0f0';
-        this.ctx.fillStyle = COLORS.text;
-        this.ctx.font = '11px Arial';
-        for (let i = 0; i <= numGridLines; i++) {
-            const y = this.padding.top + (chartHeight / numGridLines) * i;
-            const value = maxValue - (valueRange / numGridLines) * i;
-            this.ctx.beginPath();
-            this.ctx.moveTo(this.padding.left, y);
-            this.ctx.lineTo(this.width - this.padding.right, y);
-            this.ctx.stroke();
-            this.ctx.fillText('$' + Math.round(value), this.padding.left - 60, y + 4);
-        }
-
-        // Draw line
-        this.ctx.strokeStyle = COLORS.primary;
-        this.ctx.lineWidth = 3;
-        this.ctx.beginPath();
-
         const pointSpacing = chartWidth / (data.length - 1 || 1);
 
-        data.forEach((value, index) => {
-            const x = this.padding.left + index * pointSpacing;
-            const y = this.padding.top + chartHeight - ((value - minValue) / valueRange) * chartHeight;
-
-            if (index === 0) {
-                this.ctx.moveTo(x, y);
-            } else {
-                this.ctx.lineTo(x, y);
-            }
-        });
-        this.ctx.stroke();
-
-        // Draw points
-        data.forEach((value, index) => {
-            const x = this.padding.left + index * pointSpacing;
-            const y = this.padding.top + chartHeight - ((value - minValue) / valueRange) * chartHeight;
-
-            this.ctx.fillStyle = COLORS.secondary;
+        this.animate((progress) => {
+            // Draw axes
+            this.ctx.strokeStyle = COLORS.grid;
+            this.ctx.lineWidth = 1;
             this.ctx.beginPath();
-            this.ctx.arc(x, y, 4, 0, 2 * Math.PI);
-            this.ctx.fill();
-        });
+            this.ctx.moveTo(this.padding.left, this.padding.top);
+            this.ctx.lineTo(this.padding.left, this.height - this.padding.bottom);
+            this.ctx.lineTo(this.width - this.padding.right, this.height - this.padding.bottom);
+            this.ctx.stroke();
 
-        // Draw labels (show every nth label to avoid overlap)
-        const labelStep = Math.ceil(labels.length / 10);
-        this.ctx.fillStyle = COLORS.text;
-        this.ctx.font = '10px Arial';
-        this.ctx.textAlign = 'center';
-        labels.forEach((label, index) => {
-            if (index % labelStep === 0 || index === labels.length - 1) {
+            // Draw horizontal grid lines
+            const numGridLines = 5;
+            this.ctx.strokeStyle = '#f0f0f0';
+            this.ctx.fillStyle = COLORS.text;
+            this.ctx.font = '11px Arial';
+            for (let i = 0; i <= numGridLines; i++) {
+                const y = this.padding.top + (chartHeight / numGridLines) * i;
+                const value = maxValue - (valueRange / numGridLines) * i;
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.padding.left, y);
+                this.ctx.lineTo(this.width - this.padding.right, y);
+                this.ctx.stroke();
+                this.ctx.fillText('$' + Math.round(value), this.padding.left - 60, y + 4);
+            }
+
+            // Calculate how many points to draw based on animation progress
+            const pointsToDraw = Math.floor(data.length * progress);
+
+            // Draw line with animation
+            this.ctx.strokeStyle = COLORS.primary;
+            this.ctx.lineWidth = 3;
+            this.ctx.beginPath();
+
+            for (let index = 0; index <= pointsToDraw; index++) {
+                if (index >= data.length) break;
+
+                const value = data[index];
                 const x = this.padding.left + index * pointSpacing;
-                const y = this.height - this.padding.bottom + 15;
+                const y = this.padding.top + chartHeight - ((value - minValue) / valueRange) * chartHeight;
+
+                if (index === 0) {
+                    this.ctx.moveTo(x, y);
+                } else {
+                    this.ctx.lineTo(x, y);
+                }
+            }
+            this.ctx.stroke();
+
+            // Draw area under line with gradient
+            if (pointsToDraw > 0) {
                 this.ctx.save();
-                this.ctx.translate(x, y);
-                this.ctx.rotate(-Math.PI / 4);
-                this.ctx.fillText(label, 0, 0);
+                const gradient = this.ctx.createLinearGradient(0, this.padding.top, 0, this.height - this.padding.bottom);
+                gradient.addColorStop(0, 'rgba(0, 83, 152, 0.2)');
+                gradient.addColorStop(1, 'rgba(0, 83, 152, 0)');
+                this.ctx.fillStyle = gradient;
+
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.padding.left, this.height - this.padding.bottom);
+                for (let index = 0; index <= pointsToDraw; index++) {
+                    if (index >= data.length) break;
+                    const value = data[index];
+                    const x = this.padding.left + index * pointSpacing;
+                    const y = this.padding.top + chartHeight - ((value - minValue) / valueRange) * chartHeight;
+                    this.ctx.lineTo(x, y);
+                }
+                this.ctx.lineTo(this.padding.left + pointsToDraw * pointSpacing, this.height - this.padding.bottom);
+                this.ctx.closePath();
+                this.ctx.fill();
                 this.ctx.restore();
             }
+
+            // Draw points
+            for (let index = 0; index <= pointsToDraw; index++) {
+                if (index >= data.length) break;
+
+                const value = data[index];
+                const x = this.padding.left + index * pointSpacing;
+                const y = this.padding.top + chartHeight - ((value - minValue) / valueRange) * chartHeight;
+
+                // Animate point appearance
+                const pointProgress = Math.min((progress * data.length - index) * 2, 1);
+                if (pointProgress > 0) {
+                    this.ctx.fillStyle = COLORS.secondary;
+                    this.ctx.beginPath();
+                    this.ctx.arc(x, y, 4 * pointProgress, 0, 2 * Math.PI);
+                    this.ctx.fill();
+
+                    // Add to data points for tooltip
+                    if (progress === 1) {
+                        this.dataPoints.push({
+                            x: x,
+                            y: y,
+                            radius: 8,
+                            label: `${labels[index]}: $${value.toFixed(2)}`
+                        });
+                    }
+                }
+            }
+
+            // Draw labels (show every nth label to avoid overlap)
+            const labelStep = Math.ceil(labels.length / 10);
+            this.ctx.fillStyle = COLORS.text;
+            this.ctx.font = '10px Arial';
+            this.ctx.textAlign = 'center';
+            labels.forEach((label, index) => {
+                if (index % labelStep === 0 || index === labels.length - 1) {
+                    const x = this.padding.left + index * pointSpacing;
+                    const y = this.height - this.padding.bottom + 15;
+                    this.ctx.save();
+                    this.ctx.translate(x, y);
+                    this.ctx.rotate(-Math.PI / 4);
+                    this.ctx.fillText(label, 0, 0);
+                    this.ctx.restore();
+                }
+            });
         });
     }
 
@@ -604,41 +740,10 @@ function renderCharts() {
     );
 }
 
-// Apply filters to data
-function applyFilters() {
-    const dateFrom = document.getElementById('dateFrom').value;
-    const dateTo = document.getElementById('dateTo').value;
-    const blockSize = document.getElementById('blockSizeFilter').value;
-    const rir = document.getElementById('rirFilter').value;
-
-    // Filter sales data
-    filteredSalesData = priorSalesData.filter(item => {
-        // Date filter
-        if (dateFrom && item.date && item.date < dateFrom) return false;
-        if (dateTo && item.date && item.date > dateTo) return false;
-
-        // Block size filter
-        if (blockSize && item.block != blockSize) return false;
-
-        // RIR filter
-        if (rir && item.region && item.region.toLowerCase() !== rir.toLowerCase()) return false;
-
-        return true;
-    });
-
-    // Filter listings data
-    filteredListingsData = newListingsData.filter(item => {
-        // Block size filter
-        if (blockSize && item.block != blockSize) return false;
-
-        // RIR filter
-        if (rir && item.region && item.region.toLowerCase() !== rir.toLowerCase()) return false;
-
-        return true;
-    });
-
-    updateStatistics();
-    renderCharts();
+// Apply filters to data - reload from API with new filters
+async function applyFilters() {
+    // Reload data from API with new filter settings
+    await loadData();
 }
 
 // Load data from API
