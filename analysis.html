@@ -58,11 +58,38 @@
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            transition: background 0.2s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .marketplace-link::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s ease, height 0.6s ease;
         }
 
         .marketplace-link:hover {
             background: #004ECC;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 98, 255, 0.3);
+        }
+
+        .marketplace-link:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .marketplace-link:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(0, 98, 255, 0.2);
         }
 
         h2 {
@@ -81,6 +108,10 @@
             border-radius: 4px;
             margin-bottom: 30px;
             border: 1px solid #E3E5E5;
+            transition: box-shadow 0.3s ease;
+        }
+        .filters:hover {
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
         }
         .filter-row {
             display: flex;
@@ -116,11 +147,16 @@
             color: #212121;
             font-family: inherit;
             box-sizing: border-box;
-            transition: border-color 0.2s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         select:focus, input[type="date"]:focus {
             outline: none;
             border-color: #0062FF;
+            box-shadow: 0 0 0 3px rgba(0, 98, 255, 0.1);
+            transform: translateY(-1px);
+        }
+        select:hover, input[type="date"]:hover {
+            border-color: #3381FF;
         }
         button {
             padding: 12px 24px;
@@ -133,14 +169,39 @@
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            transition: background 0.2s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             font-family: inherit;
+            position: relative;
+            overflow: hidden;
         }
+
+        button::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.4);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s ease, height 0.6s ease;
+        }
+
         button:hover {
             background: #004ECC;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 98, 255, 0.3);
         }
+
+        button:hover::after {
+            width: 300px;
+            height: 300px;
+        }
+
         button:active {
-            transform: translateY(0);
+            transform: scale(0.98);
+            box-shadow: 0 2px 8px rgba(0, 98, 255, 0.2);
         }
         .charts-grid {
             display: grid;
@@ -156,6 +217,12 @@
             opacity: 0;
             animation: fadeInUp 0.6s ease-out forwards;
             box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .chart-container:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            border-color: rgba(0, 98, 255, 0.2);
         }
         .chart-container:nth-child(1) { animation-delay: 0.1s; }
         .chart-container:nth-child(2) { animation-delay: 0.2s; }
@@ -175,6 +242,11 @@
             width: 100% !important;
             height: 400px !important;
             display: block;
+            cursor: crosshair;
+            transition: opacity 0.3s ease;
+        }
+        canvas:hover {
+            opacity: 0.95;
         }
         @keyframes fadeInUp {
             to {
@@ -207,6 +279,11 @@
             color: #424647;
             font-size: 16px;
             line-height: 1.5;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
         }
         .error {
             background-color: #FFE8E8;
@@ -234,6 +311,31 @@
             box-shadow: 0 2px 8px rgba(0,98,255,0.15);
             opacity: 0;
             animation: countUp 0.5s ease-out forwards;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: default;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .stat-box:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 8px 24px rgba(0,98,255,0.25);
+            background: #3381FF;
+        }
+
+        .stat-box:hover::before {
+            left: 100%;
         }
         .stat-box:nth-child(1) { animation-delay: 0.1s; }
         .stat-box:nth-child(2) { animation-delay: 0.2s; }
@@ -252,6 +354,10 @@
             font-size: 30px;
             line-height: 1.25;
             font-weight: bold;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .stat-box:hover .stat-value {
+            transform: scale(1.1);
         }
         .tooltip {
             position: fixed;
@@ -264,8 +370,15 @@
             pointer-events: none;
             z-index: 10000;
             white-space: nowrap;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             display: none;
+            opacity: 0;
+            transform: translateY(-5px);
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+        .tooltip.show {
+            opacity: 1;
+            transform: translateY(0);
         }
         .view-toggle {
             display: flex;
@@ -273,7 +386,26 @@
             background: #F0F2F2;
             border-radius: 4px;
             padding: 4px;
+            position: relative;
         }
+
+        .view-toggle::before {
+            content: '';
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            width: calc(50% - 6px);
+            height: calc(100% - 8px);
+            background: #0062FF;
+            border-radius: 4px;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 0;
+        }
+
+        .view-toggle.listings-active::before {
+            transform: translateX(calc(100% + 4px));
+        }
+
         .view-toggle button {
             padding: 8px 16px;
             border-radius: 4px;
@@ -282,26 +414,38 @@
             color: #424647;
             cursor: pointer;
             font-weight: 600;
-            transition: all 0.2s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             font-size: 14px;
             line-height: 1.5;
             white-space: nowrap;
             box-shadow: none;
             text-transform: capitalize;
+            position: relative;
+            z-index: 1;
         }
         .view-toggle button.active {
-            background: #0062FF;
             color: #FFFFFF;
         }
         .view-toggle button:hover:not(.active) {
-            background-color: #E3E5E5;
             color: #212121;
+            transform: scale(1.05);
         }
         .view-section {
             display: none;
+            animation: fadeIn 0.4s ease-out;
         }
         .view-section.active {
             display: block;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         .description {
             font-size: 14px;
@@ -315,7 +459,7 @@
     <div class="container">
         <div class="header">
             <h1>IPv4.Global Marketplace Analysis</h1>
-            <a href="https://ipv4.global/marketplace" target="_blank" class="marketplace-link">Visit Marketplace</a>
+            <a href="https://auctions.ipv4.global/" target="_blank" class="marketplace-link">Visit Marketplace</a>
         </div>
 
         <!-- Filters Section -->

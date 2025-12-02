@@ -75,10 +75,15 @@ class SimpleChart {
         this.tooltip.style.display = 'block';
         this.tooltip.style.left = (clientX + 10) + 'px';
         this.tooltip.style.top = (clientY - 30) + 'px';
+        // Trigger smooth animation
+        setTimeout(() => this.tooltip.classList.add('show'), 10);
     }
 
     hideTooltip() {
-        this.tooltip.style.display = 'none';
+        this.tooltip.classList.remove('show');
+        setTimeout(() => {
+            this.tooltip.style.display = 'none';
+        }, 200);
     }
 
     animate(drawCallback, duration = 800) {
@@ -194,9 +199,9 @@ class SimpleChart {
         }
 
         const centerX = this.width / 2;
-        const centerY = this.height / 2;
-        // Make pie chart bigger - reduce margin from 80 to 40
-        const radius = Math.min(this.width, this.height) / 2 - 40;
+        const centerY = this.height / 2 - 20; // Shift up to make room for legend
+        // Balanced pie chart size with proper spacing
+        const radius = Math.min(this.width, this.height) / 2 - 60;
         const total = data.reduce((sum, val) => sum + val, 0);
 
         this.animate((progress) => {
@@ -907,17 +912,20 @@ function toggleView(viewType) {
     const currentListingsBtn = document.getElementById('viewCurrentListings');
     const priorSalesSection = document.getElementById('priorSalesSection');
     const currentListingsSection = document.getElementById('currentListingsSection');
+    const viewToggle = document.querySelector('.view-toggle');
 
     if (viewType === 'priorSales') {
         priorSalesBtn.classList.add('active');
         currentListingsBtn.classList.remove('active');
         priorSalesSection.classList.add('active');
         currentListingsSection.classList.remove('active');
+        viewToggle.classList.remove('listings-active');
     } else {
         currentListingsBtn.classList.add('active');
         priorSalesBtn.classList.remove('active');
         currentListingsSection.classList.add('active');
         priorSalesSection.classList.remove('active');
+        viewToggle.classList.add('listings-active');
     }
 
     // Re-render charts for the active view
