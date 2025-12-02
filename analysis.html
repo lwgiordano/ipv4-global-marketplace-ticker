@@ -50,10 +50,11 @@
         .marketplace-link {
             display: inline-block;
             padding: 12px 24px;
-            background: #0062FF;
-            color: #FFFFFF;
+            background: transparent;
+            color: #0062FF;
             text-decoration: none;
             border-radius: 4px;
+            border: 2px solid #0062FF;
             font-size: 14px;
             font-weight: 600;
             text-transform: uppercase;
@@ -71,13 +72,14 @@
             width: 0;
             height: 0;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(0, 98, 255, 0.1);
             transform: translate(-50%, -50%);
             transition: width 0.6s ease, height 0.6s ease;
         }
 
         .marketplace-link:hover {
-            background: #004ECC;
+            background: #0062FF;
+            color: #FFFFFF;
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(0, 98, 255, 0.3);
         }
@@ -102,6 +104,14 @@
             padding-bottom: 10px;
             border-bottom: 2px solid #0062FF;
         }
+        .view-selector-container {
+            background: #FFFFFF;
+            padding: 20px 30px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            border: 1px solid #E3E5E5;
+        }
+
         .filters {
             background: #F8FAFA;
             padding: 30px;
@@ -135,7 +145,6 @@
             display: flex;
             align-items: flex-end;
             gap: 12px;
-            margin-bottom: 20px;
         }
 
         .view-selector label {
@@ -611,6 +620,10 @@
                 gap: 15px;
             }
 
+            .view-selector-container {
+                padding: 15px 20px;
+            }
+
             h1 {
                 font-size: 24px;
             }
@@ -755,8 +768,8 @@
             <a href="https://auctions.ipv4.global/" target="_blank" class="marketplace-link">Visit Marketplace</a>
         </div>
 
-        <!-- Filters Section -->
-        <div class="filters">
+        <!-- View Selector Section -->
+        <div class="view-selector-container">
             <div class="view-selector">
                 <label>View:</label>
                 <div class="view-toggle">
@@ -764,6 +777,10 @@
                     <button id="viewCurrentListings">Current Listings</button>
                 </div>
             </div>
+        </div>
+
+        <!-- Filters Section -->
+        <div class="filters">
             <div class="filter-row">
                 <div class="filter-group">
                     <label for="dateFrom">From Date:</label>
