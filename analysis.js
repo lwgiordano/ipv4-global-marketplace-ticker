@@ -127,7 +127,7 @@ class SimpleChart {
                 this.ctx.moveTo(this.padding.left, y);
                 this.ctx.lineTo(this.width - this.padding.right, y);
                 this.ctx.stroke();
-                this.ctx.fillText(Math.round(value), this.padding.left - 60, y + 4);
+                this.ctx.fillText('$' + value.toFixed(2), this.padding.left - 60, y + 4);
             }
 
             // Draw bars with animation
@@ -151,7 +151,7 @@ class SimpleChart {
                         x: x + barWidth / 2,
                         y: y,
                         radius: barWidth / 2,
-                        label: `${labels[index]}: ${value}`
+                        label: `${labels[index]}: $${value.toFixed(2)}`
                     });
                 }
 
@@ -161,7 +161,7 @@ class SimpleChart {
                     this.ctx.font = 'bold 11px Arial';
                     this.ctx.textAlign = 'center';
                     this.ctx.globalAlpha = (progress - 0.7) / 0.3;
-                    this.ctx.fillText(value, x + barWidth / 2, y - 5);
+                    this.ctx.fillText('$' + value.toFixed(2), x + barWidth / 2, y - 5);
                     this.ctx.globalAlpha = 1;
                 }
             });
@@ -299,7 +299,7 @@ class SimpleChart {
                 this.ctx.moveTo(this.padding.left, y);
                 this.ctx.lineTo(this.width - this.padding.right, y);
                 this.ctx.stroke();
-                this.ctx.fillText('$' + Math.round(value), this.padding.left - 60, y + 4);
+                this.ctx.fillText('$' + value.toFixed(2), this.padding.left - 60, y + 4);
             }
 
             // Calculate how many points to draw based on animation progress
