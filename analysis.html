@@ -127,14 +127,14 @@
 
         .filter-row .description {
             flex: 0 0 100%;
-            order: 1;
+            order: 999;
             margin: 16px 0 0 0;
         }
 
         .filter-group.view-selector {
             flex: 0 0 auto;
             min-width: auto;
-            order: 2;
+            order: -1;
             display: flex;
             align-items: flex-end;
             gap: 12px;
@@ -255,6 +255,9 @@
             line-height: 1.5;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+        }
+        .pie-chart-container .chart-title {
+            margin-bottom: 0;
         }
         canvas {
             display: block;
@@ -645,6 +648,13 @@
         <!-- Filters Section -->
         <div class="filters">
             <div class="filter-row">
+                <div class="filter-group view-selector">
+                    <label>View:</label>
+                    <div class="view-toggle">
+                        <button id="viewPriorSales" class="active">Prior Sales</button>
+                        <button id="viewCurrentListings">Current Listings</button>
+                    </div>
+                </div>
                 <div class="filter-group">
                     <label for="dateFrom">From Date:</label>
                     <input type="date" id="dateFrom">
@@ -674,13 +684,6 @@
                     <button id="applyFilters">Apply Filters</button>
                 </div>
                 <p class="description">Filter the dashboard data by date range, block size, and Regional Internet Registry (RIR).</p>
-                <div class="filter-group view-selector">
-                    <label>View:</label>
-                    <div class="view-toggle">
-                        <button id="viewPriorSales" class="active">Prior Sales</button>
-                        <button id="viewCurrentListings">Current Listings</button>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -700,11 +703,11 @@
                     <div class="stat-value" id="avgSalePrice">-</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-label">Highest Sale / IP</div>
+                    <div class="stat-label">Highest Sale Price / IP</div>
                     <div class="stat-value" id="maxSalePrice">-</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-label">Lowest Sale / IP</div>
+                    <div class="stat-label">Lowest Sale Price / IP</div>
                     <div class="stat-value" id="minSalePrice">-</div>
                 </div>
             </div>
@@ -715,7 +718,7 @@
                     <div class="chart-title">Price Trends Over Time (per IP)</div>
                     <canvas id="salesTrendChart"></canvas>
                 </div>
-                <div class="chart-container">
+                <div class="chart-container pie-chart-container">
                     <div class="chart-title">Sales Volume by RIR</div>
                     <canvas id="salesByRirChart"></canvas>
                 </div>
@@ -742,11 +745,11 @@
                     <div class="stat-value" id="avgAskingPrice">-</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-label">Highest Asking / IP</div>
+                    <div class="stat-label">Highest Asking Price / IP</div>
                     <div class="stat-value" id="maxAskingPrice">-</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-label">Lowest Asking / IP</div>
+                    <div class="stat-label">Lowest Asking Price / IP</div>
                     <div class="stat-value" id="minAskingPrice">-</div>
                 </div>
             </div>
@@ -757,7 +760,7 @@
                     <div class="chart-title">Asking Prices by Block Size (per IP)</div>
                     <canvas id="listingsPriceByBlockChart"></canvas>
                 </div>
-                <div class="chart-container">
+                <div class="chart-container pie-chart-container">
                     <div class="chart-title">Available Inventory by RIR</div>
                     <canvas id="listingsByRirChart"></canvas>
                 </div>
