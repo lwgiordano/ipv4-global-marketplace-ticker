@@ -126,6 +126,11 @@
         .filter-group.view-selector {
             flex: 0 0 auto;
             min-width: auto;
+            max-width: 280px;
+        }
+
+        .filter-group.view-selector label {
+            margin-bottom: 8px;
         }
         label {
             display: block;
@@ -365,6 +370,8 @@
             padding: 4px;
             position: relative;
             isolation: isolate;
+            width: 100%;
+            min-width: 260px;
         }
 
         .view-toggle::before {
@@ -375,7 +382,7 @@
             width: 0;
             height: calc(100% - 8px);
             background: #0062FF;
-            border-radius: 4px;
+            border-radius: 2px;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 0;
         }
@@ -385,14 +392,14 @@
         }
 
         .view-toggle.listings-active::before {
-            left: calc(50% + 0px);
+            left: calc(50%);
             width: calc(50% - 4px);
         }
 
         .view-toggle button {
-            flex: 1;
-            padding: 8px 16px;
-            border-radius: 4px;
+            flex: 1 1 50%;
+            padding: 10px 20px;
+            border-radius: 2px;
             border: none;
             background: transparent;
             color: #424647;
@@ -402,19 +409,37 @@
             font-size: 14px;
             line-height: 1.5;
             white-space: nowrap;
-            box-shadow: none;
+            box-shadow: none !important;
             text-transform: capitalize;
             position: relative;
             z-index: 1;
+            overflow: visible;
+            transform: none !important;
+            letter-spacing: normal;
+            min-width: 0;
+            margin: 0;
         }
+
+        .view-toggle button::after {
+            display: none !important;
+        }
+
         .view-toggle button.active {
             color: #FFFFFF;
         }
+
         .view-toggle button:hover {
             color: #212121;
+            background: transparent;
         }
+
         .view-toggle button.active:hover {
             color: #FFFFFF;
+            background: transparent;
+        }
+
+        .view-toggle button:active {
+            transform: none !important;
         }
         .view-section {
             display: none;
@@ -488,15 +513,17 @@
 
             .filter-group.view-selector {
                 width: 100%;
+                max-width: 100%;
             }
 
             .view-toggle {
                 width: 100%;
+                min-width: 100%;
             }
 
             .view-toggle button {
-                flex: 1;
-                padding: 10px 12px;
+                flex: 1 1 50%;
+                padding: 12px 16px;
                 font-size: 13px;
             }
 
