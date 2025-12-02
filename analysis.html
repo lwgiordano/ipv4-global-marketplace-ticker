@@ -152,7 +152,6 @@
         select:focus, input[type="date"]:focus {
             outline: none;
             border-color: #0062FF;
-            box-shadow: 0 0 0 3px rgba(0, 98, 255, 0.1);
             transform: translateY(-1px);
         }
         select:hover, input[type="date"]:hover {
@@ -311,31 +310,13 @@
             box-shadow: 0 2px 8px rgba(0,98,255,0.15);
             opacity: 0;
             animation: countUp 0.5s ease-out forwards;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: default;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .stat-box::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
-            transition: left 0.5s ease;
         }
 
         .stat-box:hover {
-            transform: translateY(-4px) scale(1.02);
-            box-shadow: 0 8px 24px rgba(0,98,255,0.25);
-            background: #3381FF;
-        }
-
-        .stat-box:hover::before {
-            left: 100%;
+            transform: translateY(-6px);
+            box-shadow: 0 12px 24px rgba(0,98,255,0.3);
         }
         .stat-box:nth-child(1) { animation-delay: 0.1s; }
         .stat-box:nth-child(2) { animation-delay: 0.2s; }
@@ -354,10 +335,6 @@
             font-size: 30px;
             line-height: 1.25;
             font-weight: bold;
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .stat-box:hover .stat-value {
-            transform: scale(1.1);
         }
         .tooltip {
             position: fixed;
@@ -381,8 +358,8 @@
             transform: translateY(0);
         }
         .view-toggle {
-            display: flex;
-            gap: 4px;
+            display: inline-flex;
+            gap: 0;
             background: #F0F2F2;
             border-radius: 4px;
             padding: 4px;
@@ -394,16 +371,17 @@
             position: absolute;
             top: 4px;
             left: 4px;
-            width: calc(50% - 6px);
+            width: calc(50% - 4px);
             height: calc(100% - 8px);
             background: #0062FF;
             border-radius: 4px;
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 0;
+            pointer-events: none;
         }
 
         .view-toggle.listings-active::before {
-            transform: translateX(calc(100% + 4px));
+            transform: translateX(100%);
         }
 
         .view-toggle button {
@@ -414,7 +392,7 @@
             color: #424647;
             cursor: pointer;
             font-weight: 600;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             font-size: 14px;
             line-height: 1.5;
             white-space: nowrap;
@@ -426,9 +404,11 @@
         .view-toggle button.active {
             color: #FFFFFF;
         }
-        .view-toggle button:hover:not(.active) {
+        .view-toggle button:hover {
             color: #212121;
-            transform: scale(1.05);
+        }
+        .view-toggle button.active:hover {
+            color: #FFFFFF;
         }
         .view-section {
             display: none;
@@ -452,6 +432,167 @@
             line-height: 1.5;
             color: #424647;
             margin-top: 16px;
+        }
+
+        /* Mobile Responsive Design */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            h2 {
+                font-size: 18px;
+                margin-top: 30px;
+            }
+
+            .marketplace-link {
+                font-size: 12px;
+                padding: 10px 20px;
+                align-self: stretch;
+                text-align: center;
+            }
+
+            .filters {
+                padding: 20px;
+            }
+
+            .filter-row {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .filter-group {
+                width: 100%;
+                min-width: 100%;
+            }
+
+            .filter-group.view-selector {
+                width: 100%;
+            }
+
+            .view-toggle {
+                width: 100%;
+            }
+
+            .view-toggle button {
+                flex: 1;
+                padding: 10px 12px;
+                font-size: 13px;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .chart-container {
+                padding: 16px;
+            }
+
+            .chart-title {
+                font-size: 12px;
+                margin-bottom: 15px;
+            }
+
+            canvas {
+                height: 280px !important;
+            }
+
+            .stats-row {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .stat-box {
+                min-width: 100%;
+                padding: 20px;
+            }
+
+            .stat-value {
+                font-size: 26px;
+            }
+
+            .stat-label {
+                font-size: 11px;
+            }
+        }
+
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .container {
+                padding: 30px;
+            }
+
+            h1 {
+                font-size: 26px;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+                gap: 25px;
+            }
+
+            canvas {
+                height: 340px !important;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 5px;
+            }
+
+            .container {
+                padding: 15px;
+                border-radius: 0;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+
+            h2 {
+                font-size: 16px;
+            }
+
+            .filters {
+                padding: 15px;
+            }
+
+            .chart-container {
+                padding: 12px;
+            }
+
+            canvas {
+                height: 240px !important;
+            }
+
+            .stat-value {
+                font-size: 22px;
+            }
+
+            button {
+                padding: 10px 16px;
+                font-size: 12px;
+            }
+
+            select, input[type="date"] {
+                font-size: 14px;
+                padding: 8px 10px;
+            }
         }
     </style>
 </head>

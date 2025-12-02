@@ -141,7 +141,7 @@ class SimpleChart {
                 this.ctx.lineTo(this.width - this.padding.right, y);
                 this.ctx.stroke();
                 // Format as price or count based on chart type
-                const formattedValue = isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
+                const formattedValue = isPriceChart ? formatPrice(value, true) : Math.round(value).toLocaleString();
                 this.ctx.fillText(formattedValue, this.padding.left - 60, y + 4);
             }
 
@@ -158,7 +158,7 @@ class SimpleChart {
 
                 // Add to data points for tooltip
                 if (progress === 1) {
-                    const formattedValue = isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
+                    const formattedValue = isPriceChart ? formatPrice(value, true) : Math.round(value).toLocaleString();
                     this.dataPoints.push({
                         x: x + barWidth / 2,
                         y: y,
@@ -173,7 +173,7 @@ class SimpleChart {
                     this.ctx.font = 'bold 12px Proxima Nova, Arial';
                     this.ctx.textAlign = 'center';
                     this.ctx.globalAlpha = (progress - 0.7) / 0.3;
-                    const formattedValue = isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
+                    const formattedValue = isPriceChart ? formatPrice(value, true) : Math.round(value).toLocaleString();
                     this.ctx.fillText(formattedValue, x + barWidth / 2, y - 5);
                     this.ctx.globalAlpha = 1;
                 }
@@ -313,7 +313,7 @@ class SimpleChart {
                 this.ctx.moveTo(this.padding.left, y);
                 this.ctx.lineTo(this.width - this.padding.right, y);
                 this.ctx.stroke();
-                this.ctx.fillText(formatPrice(value), this.padding.left - 60, y + 4);
+                this.ctx.fillText(formatPrice(value, true), this.padding.left - 60, y + 4);
             }
 
             // Calculate how many points to draw based on animation progress
@@ -381,7 +381,7 @@ class SimpleChart {
                             x: x,
                             y: y,
                             radius: 8,
-                            label: `${labels[index]}: ${formatPrice(value)}`
+                            label: `${labels[index]}: ${formatPrice(value, true)}`
                         });
                     }
                 }
@@ -421,17 +421,20 @@ class SimpleChart {
 }
 
 // Helper function to format price with smart decimal handling
-function formatPrice(value) {
+function formatPrice(value, includePerIP = false) {
     const num = typeof value === 'number' ? value : parseFloat(value);
     if (isNaN(num)) return '$0';
 
+    let formattedPrice;
     // Check if it's a whole number
     if (num % 1 === 0) {
-        return '$' + num.toLocaleString('en-US', { maximumFractionDigits: 0 });
+        formattedPrice = '$' + num.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    } else {
+        // Has decimals, show 2 decimal places
+        formattedPrice = '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    // Has decimals, show 2 decimal places
-    return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return includePerIP ? formattedPrice + '/IP' : formattedPrice;
 }
 
 // Helper functions for date formatting
@@ -581,9 +584,9 @@ function updateStatistics() {
     const minSalePrice = salesPrices.length > 0 ? Math.min(...salesPrices) : 0;
 
     document.getElementById('totalSales').textContent = totalSales.toLocaleString();
-    document.getElementById('avgSalePrice').textContent = formatPrice(avgSalePrice);
-    document.getElementById('maxSalePrice').textContent = formatPrice(maxSalePrice);
-    document.getElementById('minSalePrice').textContent = formatPrice(minSalePrice);
+    document.getElementById('avgSalePrice').textContent = formatPrice(avgSalePrice, true);
+    document.getElementById('maxSalePrice').textContent = formatPrice(maxSalePrice, true);
+    document.getElementById('minSalePrice').textContent = formatPrice(minSalePrice, true);
     document.getElementById('salesStatsRow').style.display = 'flex';
 
     // New Listings Statistics
@@ -597,9 +600,9 @@ function updateStatistics() {
     const minAskingPrice = listingsPrices.length > 0 ? Math.min(...listingsPrices) : 0;
 
     document.getElementById('totalListings').textContent = totalListings.toLocaleString();
-    document.getElementById('avgAskingPrice').textContent = formatPrice(avgAskingPrice);
-    document.getElementById('maxAskingPrice').textContent = formatPrice(maxAskingPrice);
-    document.getElementById('minAskingPrice').textContent = formatPrice(minAskingPrice);
+    document.getElementById('avgAskingPrice').textContent = formatPrice(avgAskingPrice, true);
+    document.getElementById('maxAskingPrice').textContent = formatPrice(maxAskingPrice, true);
+    document.getElementById('minAskingPrice').textContent = formatPrice(minAskingPrice, true);
     document.getElementById('listingsStatsRow').style.display = 'flex';
 }
 
