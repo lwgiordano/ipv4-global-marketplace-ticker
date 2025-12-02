@@ -57,8 +57,8 @@ class SimpleChart {
 
         if (isPieChart) {
             // Pie charts need square canvas for perfect circles
-            // Limit max size to 450px for better proportions
-            const maxPieSize = Math.min(450, containerWidth);
+            // Limit max size to 380px for better proportions
+            const maxPieSize = Math.min(380, containerWidth);
             displayWidth = maxPieSize;
             displayHeight = maxPieSize;
         } else {
