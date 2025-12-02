@@ -176,6 +176,119 @@
         select:hover, input[type="date"]:hover {
             border-color: #3381FF;
         }
+
+        .multi-select-dropdown {
+            position: relative;
+            width: 100%;
+        }
+
+        .multi-select-header {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #E3E5E5;
+            border-radius: 4px;
+            background-color: #FFFFFF;
+            font-size: 16px;
+            line-height: 1.5;
+            color: #212121;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+        }
+
+        .multi-select-header:hover {
+            border-color: #3381FF;
+        }
+
+        .multi-select-dropdown.open .multi-select-header {
+            border-color: #0062FF;
+            transform: translateY(-1px);
+        }
+
+        .dropdown-arrow {
+            font-size: 10px;
+            transition: transform 0.3s ease;
+            color: #424647;
+        }
+
+        .multi-select-dropdown.open .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        .multi-select-options {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            background: #FFFFFF;
+            border: 1px solid #E3E5E5;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            max-height: 280px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+            animation: dropdownSlide 0.2s ease-out;
+        }
+
+        @keyframes dropdownSlide {
+            from {
+                opacity: 0;
+                transform: translateY(-8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .multi-select-dropdown.open .multi-select-options {
+            display: block;
+        }
+
+        .checkbox-option {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            user-select: none;
+        }
+
+        .checkbox-option:hover {
+            background-color: #F8FAFA;
+        }
+
+        .checkbox-option input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            margin: 0;
+            margin-right: 10px;
+            cursor: pointer;
+            accent-color: #0062FF;
+        }
+
+        .checkbox-option span {
+            font-size: 16px;
+            color: #212121;
+            line-height: 1.5;
+        }
+
+        .checkbox-divider {
+            height: 1px;
+            background: #E3E5E5;
+            margin: 4px 0;
+        }
+
+        .selected-text {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+        }
         button {
             padding: 12px 24px;
             background: #0062FF;
@@ -665,20 +778,55 @@
                 </div>
                 <div class="filter-group">
                     <label for="blockSizeFilter">Block Size:</label>
-                    <select id="blockSizeFilter">
-                        <option value="">All Sizes</option>
-                    </select>
+                    <div class="multi-select-dropdown" id="blockSizeDropdown">
+                        <div class="multi-select-header">
+                            <span class="selected-text">All Sizes</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </div>
+                        <div class="multi-select-options">
+                            <label class="checkbox-option">
+                                <input type="checkbox" value="all" checked>
+                                <span>All Sizes</span>
+                            </label>
+                            <div class="checkbox-divider"></div>
+                        </div>
+                    </div>
                 </div>
                 <div class="filter-group">
                     <label for="rirFilter">RIR:</label>
-                    <select id="rirFilter">
-                        <option value="">All RIRs</option>
-                        <option value="arin">ARIN</option>
-                        <option value="ripe">RIPE</option>
-                        <option value="apnic">APNIC</option>
-                        <option value="lacnic">LACNIC</option>
-                        <option value="afrinic">AFRINIC</option>
-                    </select>
+                    <div class="multi-select-dropdown" id="rirDropdown">
+                        <div class="multi-select-header">
+                            <span class="selected-text">All RIRs</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </div>
+                        <div class="multi-select-options">
+                            <label class="checkbox-option">
+                                <input type="checkbox" value="all" checked>
+                                <span>All RIRs</span>
+                            </label>
+                            <div class="checkbox-divider"></div>
+                            <label class="checkbox-option">
+                                <input type="checkbox" value="arin">
+                                <span>ARIN</span>
+                            </label>
+                            <label class="checkbox-option">
+                                <input type="checkbox" value="ripe">
+                                <span>RIPE</span>
+                            </label>
+                            <label class="checkbox-option">
+                                <input type="checkbox" value="apnic">
+                                <span>APNIC</span>
+                            </label>
+                            <label class="checkbox-option">
+                                <input type="checkbox" value="lacnic">
+                                <span>LACNIC</span>
+                            </label>
+                            <label class="checkbox-option">
+                                <input type="checkbox" value="afrinic">
+                                <span>AFRINIC</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
                 <div class="filter-group">
                     <button id="applyFilters">Apply Filters</button>

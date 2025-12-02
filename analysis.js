@@ -506,13 +506,113 @@ function initializeDateFilters() {
 
 // Initialize block size filter options
 function initializeBlockSizeFilter() {
-    const select = document.getElementById('blockSizeFilter');
+    const dropdown = document.getElementById('blockSizeDropdown');
+    const optionsContainer = dropdown.querySelector('.multi-select-options');
+
     for (let i = 24; i >= 8; i--) {
-        const option = document.createElement('option');
-        option.value = i;
-        option.textContent = `/${i}`;
-        select.appendChild(option);
+        const label = document.createElement('label');
+        label.className = 'checkbox-option';
+        label.innerHTML = `
+            <input type="checkbox" value="${i}">
+            <span>/${i}</span>
+        `;
+        optionsContainer.appendChild(label);
     }
+}
+
+// Multi-select dropdown functionality
+function initializeMultiSelectDropdowns() {
+    const dropdowns = document.querySelectorAll('.multi-select-dropdown');
+
+    dropdowns.forEach(dropdown => {
+        const header = dropdown.querySelector('.multi-select-header');
+        const options = dropdown.querySelector('.multi-select-options');
+        const checkboxes = dropdown.querySelectorAll('input[type="checkbox"]');
+        const allCheckbox = dropdown.querySelector('input[value="all"]');
+        const selectedText = dropdown.querySelector('.selected-text');
+
+        // Toggle dropdown
+        header.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // Close other dropdowns
+            dropdowns.forEach(d => {
+                if (d !== dropdown) d.classList.remove('open');
+            });
+            dropdown.classList.toggle('open');
+        });
+
+        // Handle checkbox changes
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                e.stopPropagation();
+
+                if (checkbox === allCheckbox) {
+                    // If "All" is checked, uncheck others
+                    if (checkbox.checked) {
+                        checkboxes.forEach(cb => {
+                            if (cb !== allCheckbox) cb.checked = false;
+                        });
+                    }
+                } else {
+                    // If any other is checked, uncheck "All"
+                    if (checkbox.checked) {
+                        allCheckbox.checked = false;
+                    }
+
+                    // If none are checked, check "All"
+                    const anyChecked = Array.from(checkboxes).some(cb => cb !== allCheckbox && cb.checked);
+                    if (!anyChecked) {
+                        allCheckbox.checked = true;
+                    }
+                }
+
+                updateDropdownText(dropdown);
+            });
+        });
+
+        // Prevent dropdown from closing when clicking inside options
+        options.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+    });
+
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', () => {
+        dropdowns.forEach(d => d.classList.remove('open'));
+    });
+}
+
+// Update dropdown display text based on selections
+function updateDropdownText(dropdown) {
+    const checkboxes = dropdown.querySelectorAll('input[type="checkbox"]');
+    const allCheckbox = dropdown.querySelector('input[value="all"]');
+    const selectedText = dropdown.querySelector('.selected-text');
+
+    const selected = Array.from(checkboxes).filter(cb => cb.checked && cb !== allCheckbox);
+
+    if (selected.length === 0 || allCheckbox.checked) {
+        const isBlockSize = dropdown.id === 'blockSizeDropdown';
+        selectedText.textContent = isBlockSize ? 'All Sizes' : 'All RIRs';
+    } else if (selected.length === 1) {
+        selectedText.textContent = selected[0].nextElementSibling.textContent;
+    } else {
+        selectedText.textContent = `${selected.length} selected`;
+    }
+}
+
+// Get selected values from dropdown
+function getSelectedValues(dropdownId) {
+    const dropdown = document.getElementById(dropdownId);
+    const checkboxes = dropdown.querySelectorAll('input[type="checkbox"]');
+    const allCheckbox = dropdown.querySelector('input[value="all"]');
+
+    if (allCheckbox.checked) {
+        return [];
+    }
+
+    return Array.from(checkboxes)
+        .filter(cb => cb.checked && cb !== allCheckbox)
+        .map(cb => cb.value);
 }
 
 // Fetch a single page of data from API
@@ -544,10 +644,20 @@ async function fetchData(endpoint, filters) {
     let offset = 0;
     let hasMore = true;
 
+    // Handle block sizes - if empty array (All selected), use all block sizes
+    const blockSizes = filters.blockSizes && filters.blockSizes.length > 0
+        ? filters.blockSizes.map(b => parseInt(b))
+        : [24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8];
+
+    // Handle RIRs - if empty array (All selected), use all RIRs
+    const regions = filters.rirs && filters.rirs.length > 0
+        ? filters.rirs
+        : ['arin', 'apnic', 'ripe', 'afrinic', 'lacnic'];
+
     const baseRequestBody = {
         filter: {
-            block: filters.blockSize ? [parseInt(filters.blockSize)] : [24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8],
-            region: filters.rir ? [filters.rir] : ['arin', 'apnic', 'ripe', 'afrinic', 'lacnic']
+            block: blockSizes,
+            region: regions
         },
         sort: { property: 'date', direction: 'desc' }
     };
@@ -915,10 +1025,10 @@ async function loadData() {
     try {
         const dateFrom = document.getElementById('dateFrom').value;
         const dateTo = document.getElementById('dateTo').value;
-        const blockSize = document.getElementById('blockSizeFilter').value;
-        const rir = document.getElementById('rirFilter').value;
+        const blockSizes = getSelectedValues('blockSizeDropdown');
+        const rirs = getSelectedValues('rirDropdown');
 
-        const filters = { dateFrom, dateTo, blockSize, rir };
+        const filters = { dateFrom, dateTo, blockSizes, rirs };
 
         // Fetch prior sales data
         loadingMessage.textContent = 'Loading prior sales data...';
@@ -982,6 +1092,7 @@ function toggleView(viewType) {
 document.addEventListener('DOMContentLoaded', () => {
     initializeDateFilters();
     initializeBlockSizeFilter();
+    initializeMultiSelectDropdowns();
 
     // Initialize view toggle
     const viewToggle = document.querySelector('.view-toggle');
