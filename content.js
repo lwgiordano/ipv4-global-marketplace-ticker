@@ -397,9 +397,9 @@
     });
     submenu.appendChild(optionsItem);
 
-    // 3) Analysis
+    // 3) Analyze
     const analysisItem = document.createElement('div');
-    analysisItem.textContent = 'Analysis';
+    analysisItem.textContent = 'Analyze';
     analysisItem.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();

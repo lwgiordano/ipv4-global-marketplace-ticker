@@ -11,17 +11,17 @@ let newListingsData = [];
 let filteredSalesData = [];
 let filteredListingsData = [];
 
-// Color scheme matching the ticker
+// Color scheme matching IPv4.Global style guide
 const COLORS = {
-    primary: '#005398',
-    secondary: '#004080',
-    arin: '#4a90e2',
-    ripe: '#50b5ff',
-    apnic: '#7ec8e3',
-    lacnic: '#3d7ca8',
-    afrinic: '#6ba3d0',
-    grid: '#e2e8f0',
-    text: '#333'
+    primary: '#0062FF',
+    secondary: '#004ECC',
+    arin: '#ADD4E4',      // Accent 3 (ARIN)
+    ripe: '#FFE070',      // Accent 5 (RIPE)
+    apnic: '#ECC6AE',     // Accent 2 (APNIC)
+    lacnic: '#CFDEBF',    // Accent 4 (LACNIC)
+    afrinic: '#CDCEEA',   // Accent 1 (AFRINIC)
+    grid: '#E3E5E5',
+    text: '#212121'
 };
 
 // Simple Chart Library using Canvas
@@ -29,8 +29,16 @@ class SimpleChart {
     constructor(canvasId) {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
-        this.width = this.canvas.width = this.canvas.offsetWidth;
-        this.height = this.canvas.height = this.canvas.offsetHeight;
+
+        // Fix blurry text on high-DPI displays
+        const dpr = window.devicePixelRatio || 1;
+        const rect = this.canvas.getBoundingClientRect();
+        this.canvas.width = rect.width * dpr;
+        this.canvas.height = rect.height * dpr;
+        this.ctx.scale(dpr, dpr);
+
+        this.width = rect.width;
+        this.height = rect.height;
         this.padding = { top: 40, right: 30, bottom: 60, left: 70 };
         this.tooltip = document.getElementById('chartTooltip');
         this.dataPoints = [];
@@ -117,9 +125,9 @@ class SimpleChart {
 
             // Draw horizontal grid lines
             const numGridLines = 5;
-            this.ctx.strokeStyle = '#f0f0f0';
+            this.ctx.strokeStyle = '#F0F2F2';
             this.ctx.fillStyle = COLORS.text;
-            this.ctx.font = '11px Arial';
+            this.ctx.font = '12px Proxima Nova, Arial';
             for (let i = 0; i <= numGridLines; i++) {
                 const y = this.padding.top + (chartHeight / numGridLines) * i;
                 const value = maxValue * (1 - i / numGridLines);
@@ -157,7 +165,7 @@ class SimpleChart {
                 // Draw value on top of bar (only when fully animated)
                 if (progress > 0.7) {
                     this.ctx.fillStyle = COLORS.text;
-                    this.ctx.font = 'bold 11px Arial';
+                    this.ctx.font = 'bold 12px Proxima Nova, Arial';
                     this.ctx.textAlign = 'center';
                     this.ctx.globalAlpha = (progress - 0.7) / 0.3;
                     const formattedValue = isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
@@ -168,7 +176,7 @@ class SimpleChart {
 
             // Draw labels
             this.ctx.fillStyle = COLORS.text;
-            this.ctx.font = '12px Arial';
+            this.ctx.font = '12px Proxima Nova, Arial';
             this.ctx.textAlign = 'center';
             labels.forEach((label, index) => {
                 const x = this.padding.left + index * barSpacing + barSpacing / 2;
@@ -187,7 +195,8 @@ class SimpleChart {
 
         const centerX = this.width / 2;
         const centerY = this.height / 2;
-        const radius = Math.min(this.width, this.height) / 2 - 80;
+        // Make pie chart bigger - reduce margin from 80 to 40
+        const radius = Math.min(this.width, this.height) / 2 - 40;
         const total = data.reduce((sum, val) => sum + val, 0);
 
         this.animate((progress) => {
@@ -229,8 +238,8 @@ class SimpleChart {
                         const labelX = centerX + Math.cos(labelAngle) * (animatedRadius * 0.7);
                         const labelY = centerY + Math.sin(labelAngle) * (animatedRadius * 0.7);
 
-                        this.ctx.fillStyle = 'white';
-                        this.ctx.font = 'bold 12px Arial';
+                        this.ctx.fillStyle = '#212121';
+                        this.ctx.font = 'bold 14px Proxima Nova, Arial';
                         this.ctx.textAlign = 'center';
                         this.ctx.textBaseline = 'middle';
                         this.ctx.globalAlpha = (progress - 0.8) / 0.2;
@@ -242,23 +251,23 @@ class SimpleChart {
                 currentAngle += sliceAngle;
             });
 
-            // Draw legend
-            const legendX = 20;
-            let legendY = this.height - this.padding.bottom - (labels.length * 25);
+            // Draw legend at bottom
+            const legendStartX = centerX - (labels.length * 60) / 2;
+            const legendY = this.height - 30;
 
             labels.forEach((label, index) => {
+                const legendX = legendStartX + (index * 60);
+
                 // Color box
                 this.ctx.fillStyle = colors[index] || this.getColor(index);
-                this.ctx.fillRect(legendX, legendY, 15, 15);
+                this.ctx.fillRect(legendX, legendY, 12, 12);
 
                 // Label text
                 this.ctx.fillStyle = COLORS.text;
-                this.ctx.font = '12px Arial';
+                this.ctx.font = '11px Proxima Nova, Arial';
                 this.ctx.textAlign = 'left';
-                this.ctx.textBaseline = 'top';
-                this.ctx.fillText(`${label} (${data[index]})`, legendX + 20, legendY);
-
-                legendY += 25;
+                this.ctx.textBaseline = 'middle';
+                this.ctx.fillText(label, legendX + 16, legendY + 6);
             });
         });
     }
@@ -289,9 +298,9 @@ class SimpleChart {
 
             // Draw horizontal grid lines
             const numGridLines = 5;
-            this.ctx.strokeStyle = '#f0f0f0';
+            this.ctx.strokeStyle = '#F0F2F2';
             this.ctx.fillStyle = COLORS.text;
-            this.ctx.font = '11px Arial';
+            this.ctx.font = '12px Proxima Nova, Arial';
             for (let i = 0; i <= numGridLines; i++) {
                 const y = this.padding.top + (chartHeight / numGridLines) * i;
                 const value = maxValue - (valueRange / numGridLines) * i;
@@ -376,7 +385,7 @@ class SimpleChart {
             // Draw labels (show every nth label to avoid overlap)
             const labelStep = Math.ceil(labels.length / 10);
             this.ctx.fillStyle = COLORS.text;
-            this.ctx.font = '10px Arial';
+            this.ctx.font = '11px Proxima Nova, Arial';
             this.ctx.textAlign = 'center';
             labels.forEach((label, index) => {
                 if (index % labelStep === 0 || index === labels.length - 1) {
@@ -393,8 +402,8 @@ class SimpleChart {
     }
 
     drawNoData() {
-        this.ctx.fillStyle = '#999';
-        this.ctx.font = '14px Arial';
+        this.ctx.fillStyle = '#424647';
+        this.ctx.font = '16px Proxima Nova, Arial';
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
         this.ctx.fillText('No data available', this.width / 2, this.height / 2);
