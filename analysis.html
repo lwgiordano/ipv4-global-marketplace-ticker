@@ -122,20 +122,29 @@
         .filter-group {
             flex: 1;
             min-width: 160px;
+            order: 0;
         }
 
-        .view-selector {
-            margin-top: 20px;
+        .filter-row .description {
+            flex: 0 0 100%;
+            order: 1;
+            margin: 16px 0 0 0;
+        }
+
+        .filter-group.view-selector {
+            flex: 0 0 auto;
+            min-width: auto;
+            order: 2;
             display: flex;
-            align-items: center;
+            align-items: flex-end;
             gap: 12px;
         }
 
-        .view-selector label {
+        .filter-group.view-selector label {
             font-weight: 600;
             color: #424647;
             font-size: 14px;
-            margin: 0;
+            margin: 0 0 10px 0;
         }
         label {
             display: block;
@@ -374,7 +383,7 @@
             padding: 4px;
             position: relative;
             isolation: isolate;
-            min-width: 280px;
+            min-width: 260px;
         }
 
         .view-toggle::before {
@@ -517,10 +526,11 @@
                 min-width: 100%;
             }
 
-            .view-selector {
+            .filter-group.view-selector {
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 8px;
+                width: 100%;
             }
 
             .view-toggle {
@@ -662,13 +672,13 @@
                 <div class="filter-group">
                     <button id="applyFilters">Apply Filters</button>
                 </div>
-            </div>
-            <p class="description">Filter the dashboard data by date range, block size, and Regional Internet Registry (RIR).</p>
-            <div class="view-selector">
-                <label>View:</label>
-                <div class="view-toggle">
-                    <button id="viewPriorSales" class="active">Prior Sales</button>
-                    <button id="viewCurrentListings">Current Listings</button>
+                <p class="description">Filter the dashboard data by date range, block size, and Regional Internet Registry (RIR).</p>
+                <div class="filter-group view-selector">
+                    <label>View:</label>
+                    <div class="view-toggle">
+                        <button id="viewPriorSales" class="active">Prior Sales</button>
+                        <button id="viewCurrentListings">Current Listings</button>
+                    </div>
                 </div>
             </div>
         </div>
