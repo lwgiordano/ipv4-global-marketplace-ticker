@@ -48,9 +48,20 @@ class SimpleChart {
         const container = this.canvas.parentElement;
         const containerWidth = container.clientWidth;
 
+        // Check if this is a pie chart (contains 'ByRir' in the canvas ID)
+        const isPieChart = this.canvasId.includes('ByRir');
+
         // Set display size (CSS pixels) with proper aspect ratio
         const displayWidth = containerWidth;
-        const displayHeight = Math.min(400, Math.max(280, containerWidth * 0.6));
+        let displayHeight;
+
+        if (isPieChart) {
+            // Pie charts need square canvas for perfect circles
+            displayHeight = displayWidth;
+        } else {
+            // Other charts use 0.6 aspect ratio
+            displayHeight = Math.min(400, Math.max(280, containerWidth * 0.6));
+        }
 
         // Fix blurry text on high-DPI displays
         const dpr = window.devicePixelRatio || 1;
