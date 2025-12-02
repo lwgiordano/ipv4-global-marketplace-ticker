@@ -322,7 +322,7 @@ async function fetchData(endpoint, filters) {
         },
         sort: { property: 'date', direction: 'desc' },
         offset: 0,
-        limit: 1000 // Get more data for analysis
+        limit: 250 // Maximum allowed by API (min: 25, max: 250)
     };
 
     // Add date range for prior sales (always required for this endpoint)
