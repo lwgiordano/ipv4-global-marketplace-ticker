@@ -11,17 +11,17 @@ let newListingsData = [];
 let filteredSalesData = [];
 let filteredListingsData = [];
 
-// Modern color scheme
+// Color scheme matching the ticker
 const COLORS = {
-    primary: '#0066cc',
-    secondary: '#0052a3',
-    arin: '#3399ff',
-    ripe: '#0088cc',
-    apnic: '#66b3ff',
-    lacnic: '#0066aa',
-    afrinic: '#99ccff',
+    primary: '#005398',
+    secondary: '#004080',
+    arin: '#4a90e2',
+    ripe: '#50b5ff',
+    apnic: '#7ec8e3',
+    lacnic: '#3d7ca8',
+    afrinic: '#6ba3d0',
     grid: '#e2e8f0',
-    text: '#2c3e50'
+    text: '#333'
 };
 
 // Simple Chart Library using Canvas
@@ -92,7 +92,7 @@ class SimpleChart {
         requestAnimationFrame(animateFrame);
     }
 
-    drawBarChart(data, labels, title) {
+    drawBarChart(data, labels, title, isPriceChart = true) {
         if (!data || data.length === 0) {
             this.clear();
             this.drawNoData();
@@ -127,7 +127,9 @@ class SimpleChart {
                 this.ctx.moveTo(this.padding.left, y);
                 this.ctx.lineTo(this.width - this.padding.right, y);
                 this.ctx.stroke();
-                this.ctx.fillText(formatPrice(value), this.padding.left - 60, y + 4);
+                // Format as price or count based on chart type
+                const formattedValue = isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
+                this.ctx.fillText(formattedValue, this.padding.left - 60, y + 4);
             }
 
             // Draw bars with animation
@@ -143,11 +145,12 @@ class SimpleChart {
 
                 // Add to data points for tooltip
                 if (progress === 1) {
+                    const formattedValue = isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
                     this.dataPoints.push({
                         x: x + barWidth / 2,
                         y: y,
                         radius: barWidth / 2,
-                        label: `${labels[index]}: ${formatPrice(value)}`
+                        label: `${labels[index]}: ${formattedValue}`
                     });
                 }
 
@@ -157,7 +160,8 @@ class SimpleChart {
                     this.ctx.font = 'bold 11px Arial';
                     this.ctx.textAlign = 'center';
                     this.ctx.globalAlpha = (progress - 0.7) / 0.3;
-                    this.ctx.fillText(formatPrice(value), x + barWidth / 2, y - 5);
+                    const formattedValue = isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
+                    this.ctx.fillText(formattedValue, x + barWidth / 2, y - 5);
                     this.ctx.globalAlpha = 1;
                 }
             });
@@ -324,7 +328,7 @@ class SimpleChart {
             // Draw area under line with solid color
             if (pointsToDraw > 0) {
                 this.ctx.save();
-                this.ctx.fillStyle = 'rgba(0, 102, 204, 0.1)';
+                this.ctx.fillStyle = 'rgba(0, 83, 152, 0.1)';
 
                 this.ctx.beginPath();
                 this.ctx.moveTo(this.padding.left, this.height - this.padding.bottom);
@@ -768,7 +772,7 @@ function analyzePriceTrends(data) {
 // Render charts based on active view
 function renderCharts() {
     const priorSalesActive = document.getElementById('priorSalesSection').classList.contains('active');
-    const newListingsActive = document.getElementById('newListingsSection').classList.contains('active');
+    const currentListingsActive = document.getElementById('currentListingsSection').classList.contains('active');
 
     if (priorSalesActive) {
         // Prior Sales Charts
@@ -785,12 +789,16 @@ function renderCharts() {
 
         new SimpleChart('salesByBlockChart').drawBarChart(
             salesBlockData.data,
-            salesBlockData.labels
+            salesBlockData.labels,
+            '',
+            false  // Not a price chart - show counts
         );
 
         new SimpleChart('salesPriceByBlockChart').drawBarChart(
             salesPriceByBlockData.data,
-            salesPriceByBlockData.labels
+            salesPriceByBlockData.labels,
+            '',
+            true  // Price chart
         );
 
         new SimpleChart('salesTrendChart').drawLineChart(
@@ -799,8 +807,8 @@ function renderCharts() {
         );
     }
 
-    if (newListingsActive) {
-        // New Listings Charts
+    if (currentListingsActive) {
+        // Current Listings Charts
         const listingsRirData = analyzeByRir(filteredListingsData);
         const listingsBlockData = analyzeByBlockSize(filteredListingsData);
         const listingsPriceByBlockData = analyzeAvgPriceByBlockSize(filteredListingsData);
@@ -814,17 +822,23 @@ function renderCharts() {
 
         new SimpleChart('listingsByBlockChart').drawBarChart(
             listingsBlockData.data,
-            listingsBlockData.labels
+            listingsBlockData.labels,
+            '',
+            false  // Not a price chart - show counts
         );
 
         new SimpleChart('listingsPriceByBlockChart').drawBarChart(
             listingsPriceByBlockData.data,
-            listingsPriceByBlockData.labels
+            listingsPriceByBlockData.labels,
+            '',
+            true  // Price chart
         );
 
         new SimpleChart('listingsPriceByRirChart').drawBarChart(
             listingsPriceByRirData.data,
-            listingsPriceByRirData.labels
+            listingsPriceByRirData.labels,
+            '',
+            true  // Price chart
         );
     }
 }
@@ -881,19 +895,19 @@ async function loadData() {
 // Toggle between views
 function toggleView(viewType) {
     const priorSalesBtn = document.getElementById('viewPriorSales');
-    const newListingsBtn = document.getElementById('viewNewListings');
+    const currentListingsBtn = document.getElementById('viewCurrentListings');
     const priorSalesSection = document.getElementById('priorSalesSection');
-    const newListingsSection = document.getElementById('newListingsSection');
+    const currentListingsSection = document.getElementById('currentListingsSection');
 
     if (viewType === 'priorSales') {
         priorSalesBtn.classList.add('active');
-        newListingsBtn.classList.remove('active');
+        currentListingsBtn.classList.remove('active');
         priorSalesSection.classList.add('active');
-        newListingsSection.classList.remove('active');
+        currentListingsSection.classList.remove('active');
     } else {
-        newListingsBtn.classList.add('active');
+        currentListingsBtn.classList.add('active');
         priorSalesBtn.classList.remove('active');
-        newListingsSection.classList.add('active');
+        currentListingsSection.classList.add('active');
         priorSalesSection.classList.remove('active');
     }
 
@@ -914,5 +928,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Set up view toggle buttons
     document.getElementById('viewPriorSales').addEventListener('click', () => toggleView('priorSales'));
-    document.getElementById('viewNewListings').addEventListener('click', () => toggleView('newListings'));
+    document.getElementById('viewCurrentListings').addEventListener('click', () => toggleView('currentListings'));
 });
