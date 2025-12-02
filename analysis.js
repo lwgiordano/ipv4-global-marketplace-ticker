@@ -29,16 +29,10 @@ class SimpleChart {
     constructor(canvasId) {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
+        this.canvasId = canvasId;
 
-        // Fix blurry text on high-DPI displays
-        const dpr = window.devicePixelRatio || 1;
-        const rect = this.canvas.getBoundingClientRect();
-        this.canvas.width = rect.width * dpr;
-        this.canvas.height = rect.height * dpr;
-        this.ctx.scale(dpr, dpr);
+        this.setupCanvas();
 
-        this.width = rect.width;
-        this.height = rect.height;
         this.padding = { top: 40, right: 30, bottom: 60, left: 70 };
         this.tooltip = document.getElementById('chartTooltip');
         this.dataPoints = [];
@@ -49,8 +43,41 @@ class SimpleChart {
         this.canvas.addEventListener('mouseleave', () => this.hideTooltip());
     }
 
+    setupCanvas() {
+        // Get the parent container width
+        const container = this.canvas.parentElement;
+        const containerWidth = container.clientWidth;
+
+        // Set display size (CSS pixels) with proper aspect ratio
+        const displayWidth = containerWidth;
+        const displayHeight = Math.min(400, Math.max(280, containerWidth * 0.6));
+
+        // Fix blurry text on high-DPI displays
+        const dpr = window.devicePixelRatio || 1;
+
+        // Set canvas display size
+        this.canvas.style.width = displayWidth + 'px';
+        this.canvas.style.height = displayHeight + 'px';
+
+        // Set actual canvas size (scaled for DPR)
+        this.canvas.width = displayWidth * dpr;
+        this.canvas.height = displayHeight * dpr;
+
+        // Scale context for DPR
+        this.ctx.scale(dpr, dpr);
+
+        // Store display dimensions for drawing
+        this.width = displayWidth;
+        this.height = displayHeight;
+    }
+
     clear() {
-        this.ctx.clearRect(0, 0, this.width, this.height);
+        // Reset transform before clearing
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        // Reapply DPR scaling
+        const dpr = window.devicePixelRatio || 1;
+        this.ctx.scale(dpr, dpr);
         this.dataPoints = [];
     }
 
@@ -957,4 +984,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Set up view toggle buttons
     document.getElementById('viewPriorSales').addEventListener('click', () => toggleView('priorSales'));
     document.getElementById('viewCurrentListings').addEventListener('click', () => toggleView('currentListings'));
+
+    // Handle window resize with debouncing
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            // Only re-render if we have data
+            if (filteredSalesData.length > 0 || filteredListingsData.length > 0) {
+                renderCharts();
+            }
+        }, 250);
+    });
 });

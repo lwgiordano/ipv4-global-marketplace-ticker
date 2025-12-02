@@ -243,11 +243,10 @@
             letter-spacing: 0.5px;
         }
         canvas {
-            width: 100% !important;
-            height: 400px !important;
             display: block;
             cursor: crosshair;
             transition: opacity 0.3s ease;
+            max-width: 100%;
         }
         canvas:hover {
             opacity: 0.95;
@@ -541,10 +540,6 @@
                 margin-bottom: 15px;
             }
 
-            canvas {
-                height: 280px !important;
-            }
-
             .stats-row {
                 flex-direction: column;
                 gap: 15px;
@@ -577,10 +572,6 @@
                 grid-template-columns: 1fr;
                 gap: 25px;
             }
-
-            canvas {
-                height: 340px !important;
-            }
         }
 
         @media (max-width: 480px) {
@@ -607,10 +598,6 @@
 
             .chart-container {
                 padding: 12px;
-            }
-
-            canvas {
-                height: 240px !important;
             }
 
             .stat-value {
