@@ -495,12 +495,13 @@ function getTomorrowDate() {
     return formatDate(tomorrow);
 }
 
-// Initialize date filters to current year
+// Initialize date filters to 90 days ago
 function initializeDateFilters() {
     const now = new Date();
-    const yearStart = new Date(now.getFullYear(), 0, 1);
+    const ninetyDaysAgo = new Date(now);
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-    document.getElementById('dateFrom').value = formatDate(yearStart);
+    document.getElementById('dateFrom').value = formatDate(ninetyDaysAgo);
     document.getElementById('dateTo').value = formatDate(now);
 }
 
@@ -1064,6 +1065,8 @@ function toggleView(viewType) {
     const priorSalesSection = document.getElementById('priorSalesSection');
     const currentListingsSection = document.getElementById('currentListingsSection');
     const viewToggle = document.querySelector('.view-toggle');
+    const dateFromInput = document.getElementById('dateFrom');
+    const dateToInput = document.getElementById('dateTo');
 
     // Add init class if not present
     if (!viewToggle.classList.contains('init')) {
@@ -1076,12 +1079,20 @@ function toggleView(viewType) {
         priorSalesSection.classList.add('active');
         currentListingsSection.classList.remove('active');
         viewToggle.classList.remove('listings-active');
+
+        // Enable date inputs for Prior Sales
+        dateFromInput.disabled = false;
+        dateToInput.disabled = false;
     } else {
         currentListingsBtn.classList.add('active');
         priorSalesBtn.classList.remove('active');
         currentListingsSection.classList.add('active');
         priorSalesSection.classList.remove('active');
         viewToggle.classList.add('listings-active');
+
+        // Disable date inputs for Current Listings
+        dateFromInput.disabled = true;
+        dateToInput.disabled = true;
     }
 
     // Re-render charts for the active view
