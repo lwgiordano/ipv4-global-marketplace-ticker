@@ -102,29 +102,27 @@ class SimpleChart {
 
         // Check if mouse is over any data point
         for (const point of this.dataPoints) {
-            // For bar charts, use rectangular hit detection
+            // For bar charts, use rectangular hit detection with padding
             if (point.width && point.height) {
-                const left = point.x - point.width / 2;
-                const right = point.x + point.width / 2;
-                const top = point.y;
-                const bottom = point.y + point.height;
+                const padding = 5;
+                const left = point.x - point.width / 2 - padding;
+                const right = point.x + point.width / 2 + padding;
+                const top = point.y - padding;
+                const bottom = point.y + point.height + padding;
 
                 if (x >= left && x <= right && y >= top && y <= bottom) {
                     this.showTooltip(point, e.clientX, e.clientY);
-                    this.canvas.style.cursor = 'pointer';
                     return;
                 }
             } else {
-                // For pie and line charts, use circular hit detection with larger radius
+                // For pie and line charts, use circular hit detection
                 const distance = Math.sqrt(Math.pow(x - point.x, 2) + Math.pow(y - point.y, 2));
                 if (distance < (point.radius || 10)) {
                     this.showTooltip(point, e.clientX, e.clientY);
-                    this.canvas.style.cursor = 'pointer';
                     return;
                 }
             }
         }
-        this.canvas.style.cursor = 'crosshair';
         this.hideTooltip();
     }
 
@@ -283,13 +281,13 @@ class SimpleChart {
                 this.ctx.lineWidth = 2;
                 this.ctx.stroke();
 
-                // Add to data points for tooltip - larger radius for easier hovering
+                // Add to data points for tooltip
                 if (progress === 1) {
                     const midAngle = currentAngle + sliceAngle / 2;
                     this.dataPoints.push({
                         x: centerX + Math.cos(midAngle) * (radius * 0.7),
                         y: centerY + Math.sin(midAngle) * (radius * 0.7),
-                        radius: 50,
+                        radius: 35,
                         label: `${labels[index]}: ${value} (${((value/total)*100).toFixed(1)}%)`
                     });
                 }
@@ -434,12 +432,12 @@ class SimpleChart {
                     this.ctx.arc(x, y, 4 * pointProgress, 0, 2 * Math.PI);
                     this.ctx.fill();
 
-                    // Add to data points for tooltip - larger radius for easier hovering
+                    // Add to data points for tooltip
                     if (progress === 1) {
                         this.dataPoints.push({
                             x: x,
                             y: y,
-                            radius: 20,
+                            radius: 15,
                             label: `${labels[index]}: ${formatPrice(value)}`
                         });
                     }
