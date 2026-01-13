@@ -709,49 +709,12 @@
     notifyBannerVisible = false;
   }
 
-  // Initialize audio context - only call after user interaction
-  function initAudioContext() {
-    if (!userHasInteracted) {
-      return null; // Don't create until user has interacted
-    }
-    if (!audioContext) {
-      try {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      } catch (e) {
-        // Silently fail - audio not critical
-      }
-    }
-    return audioContext;
-  }
-
-  // Get audio context ready for playback
-  async function ensureAudioContextReady() {
-    if (!userHasInteracted) {
-      return null; // Can't play audio without user interaction
-    }
-
-    const ctx = initAudioContext();
-    if (!ctx) return null;
-
-    if (ctx.state === 'suspended') {
-      try {
-        await ctx.resume();
-      } catch (e) {
-        return null; // Silently fail
-      }
-    }
-    return ctx;
-  }
-
   // Track user interaction for audio permission
   function setupUserInteractionTracking() {
     const interactionEvents = ['click', 'keydown', 'touchstart'];
     const handleInteraction = () => {
       if (!userHasInteracted) {
         userHasInteracted = true;
-        // Try to initialize and resume audio context on first interaction
-        ensureAudioContextReady();
-        // Remove listeners after first interaction
         interactionEvents.forEach(event => {
           document.removeEventListener(event, handleInteraction);
         });
@@ -763,70 +726,76 @@
   }
 
   async function playNotificationSound() {
+    // MUST check this first - before ANY audio-related code
+    if (!userHasInteracted) return;
+
     try {
       const soundEnabled = await getSetting(CONFIG.notifyMeSoundKey, true);
       if (!soundEnabled) return;
 
-      // Get or create audio context - only works after user interaction
-      const audioCtx = await ensureAudioContextReady();
-      if (!audioCtx || audioCtx.state !== 'running') {
-        return; // Silently skip - no user interaction yet
+      // Create audio context only after confirmed user interaction
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
       }
+
+      // Resume if suspended
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+
+      if (audioContext.state !== 'running') return;
 
       const soundType = await getSetting(CONFIG.notifyMeSoundTypeKey, 'chime');
 
-      // Simple beep/chime sound generation
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
 
       oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
+      gainNode.connect(audioContext.destination);
 
-      // Different sound types
       switch (soundType) {
         case 'bell':
           oscillator.frequency.value = 830;
           oscillator.type = 'sine';
-          gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-          gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-          oscillator.start(audioCtx.currentTime);
-          oscillator.stop(audioCtx.currentTime + 0.5);
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.5);
           break;
         case 'alert':
           oscillator.frequency.value = 440;
           oscillator.type = 'square';
-          gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
-          gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-          oscillator.start(audioCtx.currentTime);
-          oscillator.stop(audioCtx.currentTime + 0.3);
+          gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.3);
           break;
         case 'chime':
         default:
-          oscillator.frequency.value = 587; // D5
+          oscillator.frequency.value = 587;
           oscillator.type = 'sine';
-          gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-          gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
-          oscillator.start(audioCtx.currentTime);
-          oscillator.stop(audioCtx.currentTime + 0.4);
-          // Second tone for chime
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.4);
           setTimeout(() => {
             try {
-              const osc2 = audioCtx.createOscillator();
-              const gain2 = audioCtx.createGain();
+              const osc2 = audioContext.createOscillator();
+              const gain2 = audioContext.createGain();
               osc2.connect(gain2);
-              gain2.connect(audioCtx.destination);
-              osc2.frequency.value = 880; // A5
+              gain2.connect(audioContext.destination);
+              osc2.frequency.value = 880;
               osc2.type = 'sine';
-              gain2.gain.setValueAtTime(0.25, audioCtx.currentTime);
-              gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-              osc2.start(audioCtx.currentTime);
-              osc2.stop(audioCtx.currentTime + 0.3);
+              gain2.gain.setValueAtTime(0.25, audioContext.currentTime);
+              gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+              osc2.start(audioContext.currentTime);
+              osc2.stop(audioContext.currentTime + 0.3);
             } catch (e) {}
           }, 150);
           break;
       }
     } catch (e) {
-      log.warn('Error playing notification sound:', e);
+      // Silently ignore all audio errors
     }
   }
 
