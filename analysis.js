@@ -100,13 +100,24 @@ class SimpleChart {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
+        // For bar charts, find the closest bar center
+        let closestBarPoint = null;
+        let closestBarDistance = Infinity;
+
         // Check if mouse is over any data point
         for (const point of this.dataPoints) {
             // For bar charts, use rectangular hit detection
             if (point.left !== undefined && point.right !== undefined) {
+                // Check if within the vertical and horizontal range
                 if (x >= point.left && x <= point.right && y >= point.top && y <= point.bottom) {
-                    this.showTooltip(point, e.clientX, e.clientY);
-                    return;
+                    // Calculate distance to bar center
+                    const barCenterX = (point.left + point.right) / 2;
+                    const distance = Math.abs(x - barCenterX);
+
+                    if (distance < closestBarDistance) {
+                        closestBarDistance = distance;
+                        closestBarPoint = point;
+                    }
                 }
             } else {
                 // For pie and line charts, use circular hit detection
@@ -117,6 +128,13 @@ class SimpleChart {
                 }
             }
         }
+
+        // If we found a closest bar, show its tooltip
+        if (closestBarPoint) {
+            this.showTooltip(closestBarPoint, e.clientX, e.clientY);
+            return;
+        }
+
         this.hideTooltip();
     }
 
