@@ -170,6 +170,12 @@ class SimpleChart {
             const actualChartWidth = actualChartRight - actualChartLeft;
             const actualChartHeight = actualChartBottom - actualChartTop;
 
+            // Check if mouse is within chart area
+            if (x < actualChartLeft || x > actualChartRight || y < actualChartTop || y > actualChartBottom) {
+                this.hideTooltip();
+                return;
+            }
+
             const numPoints = meta.data.length;
             const actualPointSpacing = actualChartWidth / (numPoints - 1 || 1);
 
