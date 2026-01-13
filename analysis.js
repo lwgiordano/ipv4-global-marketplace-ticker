@@ -208,12 +208,15 @@ class SimpleChart {
                 // Add to data points for tooltip - store exact bar boundaries
                 if (progress === 1) {
                     const formattedValue = isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
+                    // Add small horizontal padding for easier clicking, but constrain to bar spacing
+                    const hPadding = Math.min(3, (barSpacing - barWidth) / 2);
                     this.dataPoints.push({
-                        left: x,
-                        right: x + barWidth,
+                        left: x - hPadding,
+                        right: x + barWidth + hPadding,
                         top: y,
                         bottom: this.height - this.padding.bottom,
-                        label: `${labels[index]}: ${formattedValue}`
+                        label: `${labels[index]}: ${formattedValue}`,
+                        isBar: true
                     });
                 }
 
