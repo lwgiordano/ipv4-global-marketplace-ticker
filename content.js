@@ -404,6 +404,7 @@
     banner.innerHTML = `
       <div id="ipv4-notify-header">
         <span id="ipv4-notify-title">New Listing Match!</span>
+        <button id="ipv4-notify-clear-all">Clear All</button>
       </div>
       <div id="ipv4-notify-content">
         <div id="ipv4-notify-items"></div>
@@ -411,6 +412,14 @@
       </div>
     `;
     document.body.appendChild(banner);
+
+    // Add click handler for Clear All button
+    const clearAllBtn = banner.querySelector('#ipv4-notify-clear-all');
+    if (clearAllBtn) {
+      clearAllBtn.addEventListener('click', () => {
+        hideNotifyBanner();
+      });
+    }
 
     return banner;
   }
@@ -1022,7 +1031,7 @@
     });
 
     function handleMouseMove(e) { if(!dragState.isDragging)return;const deltaX = e.clientX - dragState.startX; const deltaY = e.clientY - dragState.startY; const absX = Math.abs(deltaX); const absY = Math.abs(deltaY); dragState.dragDistance+=Math.abs(e.clientX-dragState.initialClickX);if(!dragState.isHorizontalDrag&&!dragState.isVerticalDrag){if(absX>5||absY>5){if(isMinimized){dragState.isHorizontalDrag=absX>absY*1.5;dragState.isVerticalDrag=!dragState.isHorizontalDrag;}else{dragState.isHorizontalDrag=absX>absY;dragState.isVerticalDrag=!dragState.isHorizontalDrag;}log.info("Drag dir:",{H:dragState.isHorizontalDrag,V:dragState.isVerticalDrag});}}if(isMinimized){if(dragState.isVerticalDrag){handleVerticalDrag(e);return;}if(dragState.isHorizontalDrag&&deltaX<0&&absX>10){if(!isDragExpanding){startDragExpansion(banner,e);}else{handleDragExpansion(banner,e);}return;}return;}if(isDragExpanding){handleDragExpansion(banner,e);return;}if(dragState.isHorizontalDrag&&!isMinimized){const viewportWidth=getViewportWidth();if(dragState.alwaysUseRight||!dragState.isUsingLeft){let newWidth=dragState.startWidth-deltaX;if(deltaX>0&&newWidth<CONFIG.autoMinimizeWidth){log.info("Auto-minimizing (drag right).");preMinimizeWidth=dragState.startWidth;preMinimizeWidthPercent=calculateWidthPercentage(dragState.startWidth);if(dragHandle) dragHandle.style.cursor='auto';toggleMinimized(banner,true);dragState.isDragging=false;return;}const bannerRightPosition=dragState.startRight!==null?dragState.startRight:CONFIG.edgeGap;const maxAllowedWidth=viewportWidth-CONFIG.edgeGap-bannerRightPosition;newWidth=Math.min(newWidth,maxAllowedWidth);newWidth=Math.max(CONFIG.minWidth,newWidth);isAtMaxWidth=isWidthAtMax(newWidth);banner.style.width=newWidth+'px';dragState.lastWidth=newWidth;}else if(dragState.isUsingLeft&&!dragState.ignoreLeftPositioning){let newWidth=dragState.startWidth+deltaX;if(deltaX<0&&newWidth<CONFIG.autoMinimizeWidth){if(dragHandle) dragHandle.style.cursor='auto';toggleMinimized(banner,true);dragState.isDragging=false;return;}newWidth=Math.max(CONFIG.minWidth,newWidth);const bannerLeftPosition=dragState.startLeft!==null?dragState.startLeft:CONFIG.edgeGap;const maxAllowedWidth=viewportWidth-CONFIG.edgeGap-bannerLeftPosition;newWidth=Math.min(newWidth,maxAllowedWidth);banner.style.width=newWidth+'px';dragState.lastWidth=banner.offsetWidth;}}if(dragState.isVerticalDrag){handleVerticalDrag(e);}dragState.lastDragTime=Date.now(); }
-    function handleVerticalDrag(e) { if(!dragState.isDragging||!dragState.isVerticalDrag)return;const b=document.getElementById('ipv4-banner');if(!b)return;const dY=e.clientY-dragState.startY;const vH=getViewportHeight();if(dragState.isUsingTop){let nT=dragState.startPos+dY;nT=Math.max(0,Math.min(nT,vH-CONFIG.bannerHeight));b.style.top=nT+'px';b.style.bottom='auto';}else{let nB=dragState.startPos-dY;nB=Math.max(0,Math.min(nB,vH-CONFIG.bannerHeight));b.style.bottom=nB+'px';b.style.top='auto';}}
+    function handleVerticalDrag(e) { if(!dragState.isDragging||!dragState.isVerticalDrag)return;const b=document.getElementById('ipv4-banner');if(!b)return;const dY=e.clientY-dragState.startY;const vH=getViewportHeight();if(dragState.isUsingTop){let nT=dragState.startPos+dY;nT=Math.max(0,Math.min(nT,vH-CONFIG.bannerHeight));b.style.top=nT+'px';b.style.bottom='auto';}else{let nB=dragState.startPos-dY;nB=Math.max(0,Math.min(nB,vH-CONFIG.bannerHeight));b.style.bottom=nB+'px';b.style.top='auto';}positionNotifyBanner();}
 
     function handleMouseUp(e) {
       if (!dragState.isDragging) return;
