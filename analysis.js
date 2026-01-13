@@ -102,18 +102,18 @@ class SimpleChart {
 
         // Check if mouse is over any data point
         for (const point of this.dataPoints) {
-            // For bar charts - check using left/right/top/bottom properties
-            if (point.left !== undefined && point.right !== undefined && point.top !== undefined && point.bottom !== undefined) {
-                // Check if mouse is within the bar boundaries
-                if (x >= point.left && x <= point.right && y >= point.top && y <= point.bottom) {
+            // For pie and line charts - check using x/y/radius properties
+            if (point.x !== undefined && point.y !== undefined && point.radius !== undefined) {
+                const distance = Math.sqrt(Math.pow(x - point.x, 2) + Math.pow(y - point.y, 2));
+                if (distance < point.radius) {
                     this.showTooltip(point, e.clientX, e.clientY);
                     return;
                 }
             }
-            // For pie and line charts - check using x/y/radius properties
-            else if (point.x !== undefined && point.y !== undefined && point.radius !== undefined) {
-                const distance = Math.sqrt(Math.pow(x - point.x, 2) + Math.pow(y - point.y, 2));
-                if (distance < point.radius) {
+            // For bar charts - check using left/right/top/bottom properties
+            else if (point.left !== undefined && point.right !== undefined && point.top !== undefined && point.bottom !== undefined) {
+                // Check if mouse is within the bar boundaries
+                if (x >= point.left && x <= point.right && y >= point.top && y <= point.bottom) {
                     this.showTooltip(point, e.clientX, e.clientY);
                     return;
                 }
