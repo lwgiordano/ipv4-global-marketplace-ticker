@@ -562,7 +562,7 @@ class SimpleChart {
             labels.forEach((label, index) => {
                 if (index % labelStep === 0 || index === labels.length - 1) {
                     const x = this.padding.left + index * pointSpacing;
-                    const y = this.height - this.padding.bottom + 15;
+                    const y = this.height - this.padding.bottom + 20;
                     this.ctx.save();
                     this.ctx.translate(x, y);
                     this.ctx.rotate(-Math.PI / 4);

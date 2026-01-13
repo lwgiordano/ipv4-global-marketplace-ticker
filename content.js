@@ -709,20 +709,27 @@
     notifyBannerVisible = false;
   }
 
-  // Initialize audio context on user interaction
+  // Initialize audio context - only call after user interaction
   function initAudioContext() {
+    if (!userHasInteracted) {
+      return null; // Don't create until user has interacted
+    }
     if (!audioContext) {
       try {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
       } catch (e) {
-        log.warn('Failed to create AudioContext:', e);
+        // Silently fail - audio not critical
       }
     }
     return audioContext;
   }
 
-  // Resume audio context if suspended (requires user gesture)
+  // Get audio context ready for playback
   async function ensureAudioContextReady() {
+    if (!userHasInteracted) {
+      return null; // Can't play audio without user interaction
+    }
+
     const ctx = initAudioContext();
     if (!ctx) return null;
 
@@ -730,8 +737,7 @@
       try {
         await ctx.resume();
       } catch (e) {
-        log.info('AudioContext resume failed - waiting for user interaction');
-        return null;
+        return null; // Silently fail
       }
     }
     return ctx;
@@ -761,12 +767,10 @@
       const soundEnabled = await getSetting(CONFIG.notifyMeSoundKey, true);
       if (!soundEnabled) return;
 
-      // Get or create audio context
+      // Get or create audio context - only works after user interaction
       const audioCtx = await ensureAudioContextReady();
       if (!audioCtx || audioCtx.state !== 'running') {
-        // Can't play sound - audio context not ready (no user interaction yet)
-        log.info('Cannot play notification sound - waiting for user interaction');
-        return;
+        return; // Silently skip - no user interaction yet
       }
 
       const soundType = await getSetting(CONFIG.notifyMeSoundTypeKey, 'chime');
