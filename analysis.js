@@ -100,7 +100,7 @@ class SimpleChart {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        // For bar charts, calculate which bar is under the mouse
+        // For bar charts, find the nearest bar center
         if (this.chartMetadata && this.chartMetadata.type === 'bar') {
             const meta = this.chartMetadata;
 
@@ -110,29 +110,32 @@ class SimpleChart {
                 return;
             }
 
-            // Calculate which bar index based on X position
+            // Check if mouse is in chart area horizontally
             const relativeX = x - meta.chartLeft;
             if (relativeX < 0 || relativeX > meta.barSpacing * meta.numBars) {
                 this.hideTooltip();
                 return;
             }
 
-            // Find which bar space we're in
-            const barIndex = Math.floor(relativeX / meta.barSpacing);
-            if (barIndex < 0 || barIndex >= meta.numBars) {
-                this.hideTooltip();
-                return;
+            // Find the nearest bar center
+            let closestBarIndex = -1;
+            let closestDistance = Infinity;
+
+            for (let i = 0; i < meta.numBars; i++) {
+                const barCenterX = meta.chartLeft + i * meta.barSpacing + meta.barSpacing / 2;
+                const distance = Math.abs(x - barCenterX);
+
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    closestBarIndex = i;
+                }
             }
 
-            // Calculate the actual bar boundaries for this index
-            const barLeft = meta.chartLeft + barIndex * meta.barSpacing + (meta.barSpacing - meta.barWidth) / 2;
-            const barRight = barLeft + meta.barWidth;
-
-            // Check if mouse is actually over the bar (not just in its space)
-            if (x >= barLeft && x <= barRight) {
-                const value = meta.data[barIndex];
+            // Show tooltip if we found a bar and we're reasonably close (within half a bar spacing)
+            if (closestBarIndex >= 0 && closestDistance < meta.barSpacing / 2) {
+                const value = meta.data[closestBarIndex];
                 const formattedValue = meta.isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
-                const label = `${meta.labels[barIndex]}: ${formattedValue}`;
+                const label = `${meta.labels[closestBarIndex]}: ${formattedValue}`;
 
                 this.showTooltip({ label: label }, e.clientX, e.clientY);
                 return;
