@@ -100,8 +100,8 @@ class SimpleChart {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        // For bar charts, find the nearest bar center
-        if (this.chartMetadata && this.chartMetadata.type === 'bar') {
+        // For bar charts, find the nearest bar center using stored positions
+        if (this.chartMetadata && this.chartMetadata.type === 'bar' && this.chartMetadata.barCenters) {
             const meta = this.chartMetadata;
 
             // Check if mouse is in chart area vertically
@@ -110,32 +110,24 @@ class SimpleChart {
                 return;
             }
 
-            // Check if mouse is in chart area horizontally
-            const relativeX = x - meta.chartLeft;
-            if (relativeX < 0 || relativeX > meta.barSpacing * meta.numBars) {
-                this.hideTooltip();
-                return;
-            }
-
-            // Find the nearest bar center
-            let closestBarIndex = -1;
+            // Find the nearest bar center from stored positions
+            let closestBar = null;
             let closestDistance = Infinity;
 
-            for (let i = 0; i < meta.numBars; i++) {
-                const barCenterX = meta.chartLeft + i * meta.barSpacing + meta.barSpacing / 2;
-                const distance = Math.abs(x - barCenterX);
+            for (const bar of meta.barCenters) {
+                const distance = Math.abs(x - bar.centerX);
 
                 if (distance < closestDistance) {
                     closestDistance = distance;
-                    closestBarIndex = i;
+                    closestBar = bar;
                 }
             }
 
-            // Show tooltip if we found a bar and we're reasonably close (within half a bar spacing)
-            if (closestBarIndex >= 0 && closestDistance < meta.barSpacing / 2) {
-                const value = meta.data[closestBarIndex];
+            // Show tooltip if we found a bar and we're reasonably close
+            if (closestBar && closestDistance < 50) {
+                const value = meta.data[closestBar.index];
                 const formattedValue = meta.isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
-                const label = `${meta.labels[closestBarIndex]}: ${formattedValue}`;
+                const label = `${meta.labels[closestBar.index]}: ${formattedValue}`;
 
                 this.showTooltip({ label: label }, e.clientX, e.clientY);
                 return;
@@ -199,19 +191,8 @@ class SimpleChart {
         const barWidth = chartWidth / data.length * 0.7;
         const barSpacing = chartWidth / data.length;
 
-        // Store chart metadata for hover detection
-        this.chartMetadata = {
-            type: 'bar',
-            data: data,
-            labels: labels,
-            isPriceChart: isPriceChart,
-            barWidth: barWidth,
-            barSpacing: barSpacing,
-            chartLeft: this.padding.left,
-            chartTop: this.padding.top,
-            chartBottom: this.height - this.padding.bottom,
-            numBars: data.length
-        };
+        // Store bar center positions as we draw them
+        const barCenters = [];
 
         this.animate((progress) => {
             // Draw axes
@@ -247,6 +228,12 @@ class SimpleChart {
                 const x = this.padding.left + index * barSpacing + (barSpacing - barWidth) / 2;
                 const y = this.height - this.padding.bottom - barHeight;
 
+                // Store bar center position as we draw it
+                if (progress === 1) {
+                    const barCenterX = x + barWidth / 2;
+                    barCenters.push({ centerX: barCenterX, index: index });
+                }
+
                 // Solid color for bars
                 this.ctx.fillStyle = COLORS.primary;
                 this.ctx.fillRect(x, y, barWidth, barHeight);
@@ -272,6 +259,19 @@ class SimpleChart {
                 const y = this.height - this.padding.bottom + 20;
                 this.ctx.fillText(label, x, y);
             });
+
+            // Store metadata after drawing completes
+            if (progress === 1) {
+                this.chartMetadata = {
+                    type: 'bar',
+                    data: data,
+                    labels: labels,
+                    isPriceChart: isPriceChart,
+                    barCenters: barCenters,
+                    chartTop: this.padding.top,
+                    chartBottom: this.height - this.padding.bottom
+                };
+            }
         });
     }
 
