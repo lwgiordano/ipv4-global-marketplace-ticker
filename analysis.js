@@ -102,15 +102,9 @@ class SimpleChart {
 
         // Check if mouse is over any data point
         for (const point of this.dataPoints) {
-            // For bar charts, use rectangular hit detection with padding
-            if (point.width && point.height) {
-                const padding = 5;
-                const left = point.x - point.width / 2 - padding;
-                const right = point.x + point.width / 2 + padding;
-                const top = point.y - padding;
-                const bottom = point.y + point.height + padding;
-
-                if (x >= left && x <= right && y >= top && y <= bottom) {
+            // For bar charts, use rectangular hit detection
+            if (point.left !== undefined && point.right !== undefined) {
+                if (x >= point.left && x <= point.right && y >= point.top && y <= point.bottom) {
                     this.showTooltip(point, e.clientX, e.clientY);
                     return;
                 }
@@ -212,14 +206,15 @@ class SimpleChart {
                 this.ctx.fillStyle = COLORS.primary;
                 this.ctx.fillRect(x, y, barWidth, barHeight);
 
-                // Add to data points for tooltip - use rectangular hit area for full bar
+                // Add to data points for tooltip - store exact coordinates with small padding
                 if (progress === 1) {
                     const formattedValue = isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
+                    const padding = 2;
                     this.dataPoints.push({
-                        x: x + barWidth / 2,
-                        y: y,
-                        width: barWidth,
-                        height: barHeight,
+                        left: x - padding,
+                        right: x + barWidth + padding,
+                        top: y - padding,
+                        bottom: this.height - this.padding.bottom + padding,
                         label: `${labels[index]}: ${formattedValue}`
                     });
                 }
@@ -702,14 +697,11 @@ async function fetchData(endpoint, filters) {
             if (items.length > 0) {
                 allItems.push(...items);
                 console.log(`Received ${items.length} items (total so far: ${allItems.length})`);
-            }
-
-            // If we received fewer items than the page size, we've reached the end
-            if (items.length < pageSize) {
+                offset += pageSize;
+            } else {
+                // If we received 0 items, we've reached the end
                 hasMore = false;
                 console.log(`Pagination complete. Total items: ${allItems.length}`);
-            } else {
-                offset += pageSize;
             }
         }
 
