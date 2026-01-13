@@ -100,8 +100,8 @@ class SimpleChart {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        // For bar charts, find the nearest bar center using stored positions
-        if (this.chartMetadata && this.chartMetadata.type === 'bar' && this.chartMetadata.barCenters) {
+        // For bar charts, check if mouse is within bar boundaries
+        if (this.chartMetadata && this.chartMetadata.type === 'bar' && this.chartMetadata.barPositions) {
             const meta = this.chartMetadata;
 
             // Check if mouse is in chart area vertically
@@ -110,27 +110,16 @@ class SimpleChart {
                 return;
             }
 
-            // Find the nearest bar center from stored positions
-            let closestBar = null;
-            let closestDistance = Infinity;
+            // Find the bar that contains the mouse position using boundaries
+            for (const bar of meta.barPositions) {
+                if (x >= bar.left && x <= bar.right) {
+                    const value = meta.data[bar.index];
+                    const formattedValue = meta.isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
+                    const label = `${meta.labels[bar.index]}: ${formattedValue}`;
 
-            for (const bar of meta.barCenters) {
-                const distance = Math.abs(x - bar.centerX);
-
-                if (distance < closestDistance) {
-                    closestDistance = distance;
-                    closestBar = bar;
+                    this.showTooltip({ label: label }, e.clientX, e.clientY);
+                    return;
                 }
-            }
-
-            // Show tooltip if we found a bar and we're reasonably close
-            if (closestBar && closestDistance < 50) {
-                const value = meta.data[closestBar.index];
-                const formattedValue = meta.isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
-                const label = `${meta.labels[closestBar.index]}: ${formattedValue}`;
-
-                this.showTooltip({ label: label }, e.clientX, e.clientY);
-                return;
             }
         }
 
@@ -191,12 +180,16 @@ class SimpleChart {
         const barWidth = chartWidth / data.length * 0.7;
         const barSpacing = chartWidth / data.length;
 
-        // Pre-calculate and store ALL bar positions before animation
-        const barCenters = [];
+        // Pre-calculate and store ALL bar positions before animation (including boundaries)
+        const barPositions = [];
         data.forEach((value, index) => {
             const x = this.padding.left + index * barSpacing + (barSpacing - barWidth) / 2;
-            const barCenterX = x + barWidth / 2;
-            barCenters.push({ centerX: barCenterX, index: index });
+            barPositions.push({
+                left: x,
+                right: x + barWidth,
+                centerX: x + barWidth / 2,
+                index: index
+            });
         });
 
         // Store metadata immediately so it's available during hover
@@ -205,7 +198,7 @@ class SimpleChart {
             data: data,
             labels: labels,
             isPriceChart: isPriceChart,
-            barCenters: barCenters,
+            barPositions: barPositions,
             chartTop: this.padding.top,
             chartBottom: this.height - this.padding.bottom
         };
