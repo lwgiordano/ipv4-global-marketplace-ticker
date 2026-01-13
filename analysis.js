@@ -100,19 +100,22 @@ class SimpleChart {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        // For bar charts, find the closest bar center
+        // For bar charts, find the closest bar center within range
         let closestBarPoint = null;
         let closestBarDistance = Infinity;
 
         // Check if mouse is over any data point
         for (const point of this.dataPoints) {
-            // For bar charts, use rectangular hit detection
-            if (point.left !== undefined && point.right !== undefined) {
-                // Check if within the vertical and horizontal range
-                if (x >= point.left && x <= point.right && y >= point.top && y <= point.bottom) {
+            // For bar charts with centerX, find closest bar
+            if (point.centerX !== undefined) {
+                // Expand hit area slightly for easier hovering
+                const hitPadding = 5;
+                const inHorizontalRange = x >= (point.left - hitPadding) && x <= (point.right + hitPadding);
+                const inVerticalRange = y >= (point.top - hitPadding) && y <= (point.bottom + hitPadding);
+
+                if (inHorizontalRange && inVerticalRange) {
                     // Calculate distance to bar center
-                    const barCenterX = (point.left + point.right) / 2;
-                    const distance = Math.abs(x - barCenterX);
+                    const distance = Math.abs(x - point.centerX);
 
                     if (distance < closestBarDistance) {
                         closestBarDistance = distance;
@@ -219,15 +222,15 @@ class SimpleChart {
                 this.ctx.fillStyle = COLORS.primary;
                 this.ctx.fillRect(x, y, barWidth, barHeight);
 
-                // Add to data points for tooltip - store exact coordinates with padding
+                // Add to data points for tooltip - store center position and actual bar dimensions
                 if (progress === 1) {
                     const formattedValue = isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
-                    const padding = 8;
                     this.dataPoints.push({
-                        left: x - padding,
-                        right: x + barWidth + padding,
-                        top: y - padding,
-                        bottom: this.height - this.padding.bottom + padding,
+                        centerX: x + barWidth / 2,
+                        left: x,
+                        right: x + barWidth,
+                        top: y,
+                        bottom: this.height - this.padding.bottom,
                         label: `${labels[index]}: ${formattedValue}`
                     });
                 }
