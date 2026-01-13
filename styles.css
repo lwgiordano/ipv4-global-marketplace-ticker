@@ -295,3 +295,119 @@
     display: none !important;
   }
 }
+
+/* Notification Banner Styles */
+#ipv4-notify-banner {
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  background-color: #0062ff !important;
+  color: white !important;
+  padding: 10px 15px !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 12px rgba(0, 98, 255, 0.4) !important;
+  font-family: Arial, sans-serif !important;
+  font-size: 13px !important;
+  max-width: 350px !important;
+  min-width: 250px !important;
+  display: none;
+  animation: ipv4-notify-slide-in 0.3s ease-out !important;
+}
+
+@keyframes ipv4-notify-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+#ipv4-notify-banner.ipv4-notify-visible {
+  display: block !important;
+}
+
+#ipv4-notify-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-bottom: 8px !important;
+}
+
+#ipv4-notify-title {
+  font-weight: bold !important;
+  font-size: 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+#ipv4-notify-title::before {
+  content: '🔔' !important;
+}
+
+#ipv4-notify-close {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border: none !important;
+  color: white !important;
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 50% !important;
+  cursor: pointer !important;
+  font-size: 14px !important;
+  line-height: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background 0.2s !important;
+}
+
+#ipv4-notify-close:hover {
+  background: rgba(255, 255, 255, 0.4) !important;
+}
+
+#ipv4-notify-content {
+  margin-bottom: 10px !important;
+  line-height: 1.4 !important;
+}
+
+#ipv4-notify-items {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  max-height: 150px !important;
+  overflow-y: auto !important;
+}
+
+.ipv4-notify-item {
+  background: rgba(255, 255, 255, 0.15) !important;
+  padding: 8px 10px !important;
+  border-radius: 4px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+}
+
+.ipv4-notify-item-info {
+  display: flex !important;
+  gap: 10px !important;
+  font-weight: bold !important;
+}
+
+.ipv4-notify-item-link {
+  color: white !important;
+  text-decoration: underline !important;
+  font-size: 12px !important;
+  cursor: pointer !important;
+}
+
+.ipv4-notify-item-link:hover {
+  color: #cce5ff !important;
+}
+
+#ipv4-notify-count {
+  font-size: 12px !important;
+  opacity: 0.9 !important;
+  margin-top: 6px !important;
+}

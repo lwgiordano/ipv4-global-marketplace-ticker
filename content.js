@@ -40,7 +40,13 @@
     excludedDomainsStorageKey: 'excludedDomainsText',
     blockSizeFilterStorageKey: 'selectedBlockSize',
     rirFilterStorageKey: 'selectedRir',
-    animationSpeedSettingKey: 'animationSpeedSetting'
+    animationSpeedSettingKey: 'animationSpeedSetting',
+    // Notify Me keys
+    notifyMeEnabledKey: 'notifyMeEnabled',
+    notifyMeSoundKey: 'notifyMeSound',
+    notifyMeSoundTypeKey: 'notifyMeSoundType',
+    notifyMeRulesKey: 'notifyMeRules',
+    notifyMeDismissedKey: 'notifyMeDismissed'
   };
   const log = {
     info: function(msg, ...args) { if (CONFIG.debug) console.log('[IPv4 Banner]', msg, ...args); },
@@ -100,7 +106,9 @@
   let dragState = { isDragging: false, startY: 0, startX: 0, startTop: 0, startLeft: 0, startRight: 0, isHorizontalDrag: false, isVerticalDrag: false, startWidth: 0, isUsingTop: true, isUsingLeft: false, lastDragTime: 0, resizingDirection: null, initialClickX: 0, dragDistance: 0, lastWidth: 0, dragStartViewportX: 0, wasNearLeftEdge: false, draggedRightward: false, alwaysUseRight: true, ignoreLeftPositioning: false, expandMinX: 0, initialExpandWidth: CONFIG.initialDragExpandWidth, };
   let resizeTimeout = null; let settingsLoaded = false; let currentSettings = {};
   let isFetchingData = false;
-  let isGearSubmenuOpen = false; 
+  let isGearSubmenuOpen = false;
+  let notifyBannerVisible = false;
+  let dismissedNotifications = {}; // Maps rule IDs to sets of dismissed auction IDs
 
   const fallbackData = { [VIEW_MODES.PRIOR_SALES]: [ { block: 19, region: "arin", pricePerAddress: "$29" }, { block: 24, region: "arin", pricePerAddress: "$32.5" },{ block: 19, region: "ripe", pricePerAddress: "$30" }, { block: 22, region: "ripe", pricePerAddress: "$31.9" },{ block: 22, region: "lacnic", pricePerAddress: "$34.5" }, { block: 22, region: "arin", pricePerAddress: "$34" },{ block: 24, region: "arin", pricePerAddress: "$36" } ], [VIEW_MODES.NEW_LISTINGS]: [ { block: 24, region: "arin", askingPrice: "$35" }, { block: 22, region: "ripe", askingPrice: "$31.5" }, { block: 23, region: "apnic", askingPrice: "$32" }, { block: 21, region: "arin", askingPrice: "$30" }, { block: 24, region: "lacnic", askingPrice: "$33.5" }, { block: 23, region: "arin", askingPrice: "$31" }, { block: 22, region: "arin", askingPrice: "$29.5" } ] };
 
@@ -303,6 +311,324 @@
     return ''; // Return empty if price field or nested price field is not found
   }
 
+  // --- NOTIFICATION FUNCTIONS ---
+  function parsePrice(priceStr) {
+    if (!priceStr || typeof priceStr !== 'string') return null;
+    const cleaned = priceStr.replace(/[^0-9.]/g, '');
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? null : num;
+  }
+
+  async function loadDismissedNotifications() {
+    try {
+      const data = await getSetting(CONFIG.notifyMeDismissedKey, {});
+      dismissedNotifications = data || {};
+      log.info('Loaded dismissed notifications:', dismissedNotifications);
+    } catch (e) {
+      log.warn('Error loading dismissed notifications:', e);
+      dismissedNotifications = {};
+    }
+  }
+
+  async function saveDismissedNotifications() {
+    try {
+      await saveSetting(CONFIG.notifyMeDismissedKey, dismissedNotifications);
+    } catch (e) {
+      log.warn('Error saving dismissed notifications:', e);
+    }
+  }
+
+  function isNotificationDismissed(ruleId, auctionId) {
+    if (!dismissedNotifications[ruleId]) return false;
+    return dismissedNotifications[ruleId].includes(auctionId);
+  }
+
+  function dismissNotification(ruleId, auctionId) {
+    if (!dismissedNotifications[ruleId]) {
+      dismissedNotifications[ruleId] = [];
+    }
+    if (!dismissedNotifications[ruleId].includes(auctionId)) {
+      dismissedNotifications[ruleId].push(auctionId);
+      saveDismissedNotifications();
+    }
+  }
+
+  function itemMatchesRule(item, rule) {
+    // Check block size
+    if (rule.blockSize && rule.blockSize !== '') {
+      const ruleBlockSize = parseInt(rule.blockSize);
+      const itemBlockSize = parseInt(item.block);
+      if (ruleBlockSize !== itemBlockSize) return false;
+    }
+
+    // Check RIR
+    if (rule.rir && rule.rir !== '') {
+      const itemRir = (item.region || '').toLowerCase();
+      if (rule.rir.toLowerCase() !== itemRir) return false;
+    }
+
+    // Get item price
+    const priceFieldsToTry = ['askingPrice', 'price', 'pricePerAddress', 'listPrice', 'listingPrice', 'perAddress'];
+    let priceStr = '';
+    for (const field of priceFieldsToTry) {
+      priceStr = getValidPriceString(item, field);
+      if (priceStr && priceStr !== '$') break;
+    }
+    const itemPrice = parsePrice(priceStr);
+
+    // Check max price
+    if (rule.maxPrice && rule.maxPrice !== '') {
+      const maxPrice = parseFloat(rule.maxPrice);
+      if (itemPrice !== null && !isNaN(maxPrice) && itemPrice > maxPrice) return false;
+    }
+
+    // Check min price
+    if (rule.minPrice && rule.minPrice !== '') {
+      const minPrice = parseFloat(rule.minPrice);
+      if (itemPrice !== null && !isNaN(minPrice) && itemPrice < minPrice) return false;
+    }
+
+    return true;
+  }
+
+  function createNotifyBanner() {
+    let banner = document.getElementById('ipv4-notify-banner');
+    if (banner) return banner;
+
+    banner = document.createElement('div');
+    banner.id = 'ipv4-notify-banner';
+    banner.innerHTML = `
+      <div id="ipv4-notify-header">
+        <span id="ipv4-notify-title">New Listing Match!</span>
+        <button id="ipv4-notify-close">×</button>
+      </div>
+      <div id="ipv4-notify-content">
+        <div id="ipv4-notify-items"></div>
+        <div id="ipv4-notify-count"></div>
+      </div>
+    `;
+    document.body.appendChild(banner);
+
+    // Add close button handler
+    const closeBtn = banner.querySelector('#ipv4-notify-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', hideNotifyBanner);
+    }
+
+    return banner;
+  }
+
+  function positionNotifyBanner() {
+    const notifyBanner = document.getElementById('ipv4-notify-banner');
+    const tickerBanner = document.getElementById('ipv4-banner');
+    if (!notifyBanner || !tickerBanner) return;
+
+    const tickerRect = tickerBanner.getBoundingClientRect();
+    const notifyHeight = notifyBanner.offsetHeight || 100;
+    const viewportHeight = window.innerHeight;
+
+    // Position to the right of the ticker
+    const rightPos = parseInt(window.getComputedStyle(tickerBanner).right) || CONFIG.edgeGap;
+    notifyBanner.style.right = rightPos + 'px';
+
+    // Check if there's room below the ticker
+    const spaceBelow = viewportHeight - tickerRect.bottom - 10;
+    if (spaceBelow >= notifyHeight) {
+      // Position below
+      notifyBanner.style.top = (tickerRect.bottom + 8) + 'px';
+      notifyBanner.style.bottom = 'auto';
+    } else {
+      // Position above
+      notifyBanner.style.bottom = (viewportHeight - tickerRect.top + 8) + 'px';
+      notifyBanner.style.top = 'auto';
+    }
+  }
+
+  function showNotifyBanner(matchingItems, matchedRules) {
+    const banner = createNotifyBanner();
+    const itemsContainer = banner.querySelector('#ipv4-notify-items');
+    const countEl = banner.querySelector('#ipv4-notify-count');
+
+    if (!itemsContainer) return;
+
+    itemsContainer.innerHTML = '';
+
+    // Show up to 5 items
+    const displayItems = matchingItems.slice(0, 5);
+    displayItems.forEach(({ item, ruleId }) => {
+      const auctionId = getAuctionId(item);
+      const priceFieldsToTry = ['askingPrice', 'price', 'pricePerAddress', 'listPrice'];
+      let priceStr = '';
+      for (const field of priceFieldsToTry) {
+        priceStr = getValidPriceString(item, field);
+        if (priceStr && priceStr !== '$') break;
+      }
+
+      const itemEl = document.createElement('div');
+      itemEl.className = 'ipv4-notify-item';
+      itemEl.innerHTML = `
+        <div class="ipv4-notify-item-info">
+          <span>/${item.block || '?'}</span>
+          <span>${(item.region || '').toUpperCase()}</span>
+          <span>${priceStr || '$?'}</span>
+        </div>
+        ${auctionId ? `<a href="https://auctions.ipv4.global/auction/${auctionId}" target="_blank" class="ipv4-notify-item-link" data-rule-id="${ruleId}" data-auction-id="${auctionId}">View →</a>` : ''}
+      `;
+
+      // Add click handler to dismiss when viewing
+      const link = itemEl.querySelector('.ipv4-notify-item-link');
+      if (link) {
+        link.addEventListener('click', (e) => {
+          const rid = e.target.dataset.ruleId;
+          const aid = e.target.dataset.auctionId;
+          if (rid && aid) dismissNotification(rid, aid);
+        });
+      }
+
+      itemsContainer.appendChild(itemEl);
+    });
+
+    // Show count if more items
+    if (matchingItems.length > 5) {
+      countEl.textContent = `+${matchingItems.length - 5} more matching listings`;
+      countEl.style.display = 'block';
+    } else {
+      countEl.style.display = 'none';
+    }
+
+    banner.classList.add('ipv4-notify-visible');
+    notifyBannerVisible = true;
+    positionNotifyBanner();
+  }
+
+  function hideNotifyBanner() {
+    const banner = document.getElementById('ipv4-notify-banner');
+    if (banner) {
+      banner.classList.remove('ipv4-notify-visible');
+      // Dismiss all currently displayed items
+      const links = banner.querySelectorAll('.ipv4-notify-item-link');
+      links.forEach(link => {
+        const rid = link.dataset.ruleId;
+        const aid = link.dataset.auctionId;
+        if (rid && aid) dismissNotification(rid, aid);
+      });
+    }
+    notifyBannerVisible = false;
+  }
+
+  async function playNotificationSound() {
+    try {
+      const soundEnabled = await getSetting(CONFIG.notifyMeSoundKey, true);
+      if (!soundEnabled) return;
+
+      const soundType = await getSetting(CONFIG.notifyMeSoundTypeKey, 'chime');
+
+      // Create audio context for generating sounds
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+      // Simple beep/chime sound generation
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      // Different sound types
+      switch (soundType) {
+        case 'bell':
+          oscillator.frequency.value = 830;
+          oscillator.type = 'sine';
+          gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+          oscillator.start(audioCtx.currentTime);
+          oscillator.stop(audioCtx.currentTime + 0.5);
+          break;
+        case 'alert':
+          oscillator.frequency.value = 440;
+          oscillator.type = 'square';
+          gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+          oscillator.start(audioCtx.currentTime);
+          oscillator.stop(audioCtx.currentTime + 0.3);
+          break;
+        case 'chime':
+        default:
+          oscillator.frequency.value = 587; // D5
+          oscillator.type = 'sine';
+          gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+          oscillator.start(audioCtx.currentTime);
+          oscillator.stop(audioCtx.currentTime + 0.4);
+          // Second tone for chime
+          setTimeout(() => {
+            try {
+              const osc2 = audioCtx.createOscillator();
+              const gain2 = audioCtx.createGain();
+              osc2.connect(gain2);
+              gain2.connect(audioCtx.destination);
+              osc2.frequency.value = 880; // A5
+              osc2.type = 'sine';
+              gain2.gain.setValueAtTime(0.25, audioCtx.currentTime);
+              gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+              osc2.start(audioCtx.currentTime);
+              osc2.stop(audioCtx.currentTime + 0.3);
+            } catch (e) {}
+          }, 150);
+          break;
+      }
+    } catch (e) {
+      log.warn('Error playing notification sound:', e);
+    }
+  }
+
+  async function checkNotifications(items) {
+    if (!items || items.length === 0) return;
+
+    try {
+      const enabled = await getSetting(CONFIG.notifyMeEnabledKey, false);
+      if (!enabled) {
+        log.info('Notifications disabled');
+        return;
+      }
+
+      const rules = await getSetting(CONFIG.notifyMeRulesKey, []);
+      if (!rules || rules.length === 0) {
+        log.info('No notification rules configured');
+        return;
+      }
+
+      // Load dismissed notifications if not already loaded
+      if (Object.keys(dismissedNotifications).length === 0) {
+        await loadDismissedNotifications();
+      }
+
+      const matchingItems = [];
+      const matchedRules = new Set();
+
+      for (const item of items) {
+        const auctionId = getAuctionId(item);
+        if (!auctionId) continue;
+
+        for (const rule of rules) {
+          // Skip if already dismissed for this rule
+          if (isNotificationDismissed(rule.id, auctionId)) continue;
+
+          if (itemMatchesRule(item, rule)) {
+            matchingItems.push({ item, ruleId: rule.id, auctionId });
+            matchedRules.add(rule.id);
+          }
+        }
+      }
+
+      if (matchingItems.length > 0) {
+        log.info(`Found ${matchingItems.length} matching items for notifications`);
+        showNotifyBanner(matchingItems, matchedRules);
+        playNotificationSound();
+      }
+    } catch (e) {
+      log.error('Error checking notifications:', e);
+    }
+  }
 
   // --- UI Update and Interaction Functions ---
   function prepareBannerForExpansion(b) { 
@@ -877,7 +1203,54 @@
       reEnableTitleClick();
     }
   }
-  function fetchViaBackground(requestBodyObject, callbackOnFinish) { log.info("Fetching data via background script for URL:", getCurrentApiEndpoint()); chrome.runtime.sendMessage({type:'fetchData',url:getCurrentApiEndpoint(),body:JSON.stringify(requestBodyObject)},r=>{ try { if(chrome.runtime.lastError){log.warn('Runtime err from bg:',chrome.runtime.lastError.message);renderItems(fallbackData[currentViewMode]);return;} if(r&&r.success&&r.data){log.info("Success from bg. Raw data snippet:", r.data.substring(0,200));try{const d=JSON.parse(r.data);log.info("Parsed data from bg:", d);if(d&&Array.isArray(d.items)){if(d.items.length>0){log.info("Parsed items count:",d.items.length);renderItems(d.items);}else{log.info("Parsed items empty. Rendering 'No Data'.");renderItems([]);}return;}log.warn('Parsed data.items not array or missing:',d);renderItems([]);}catch(e){log.error('Error parsing API resp JSON:',e, "Raw data:", r.data);renderItems([]);}} else if(r&&r.error){log.warn('API error from bg:',r.error,"Details:",r.details);renderItems(fallbackData[currentViewMode]);} else{log.warn('Unknown resp from bg:',r);renderItems(fallbackData[currentViewMode]);}} finally { isFetchingData = false; if (callbackOnFinish) callbackOnFinish(); log.info("isFetchingData flag reset to false in fetchViaBackground callback."); } });}
+  function fetchViaBackground(requestBodyObject, callbackOnFinish) {
+    log.info("Fetching data via background script for URL:", getCurrentApiEndpoint());
+    chrome.runtime.sendMessage({type:'fetchData',url:getCurrentApiEndpoint(),body:JSON.stringify(requestBodyObject)}, r => {
+      try {
+        if(chrome.runtime.lastError) {
+          log.warn('Runtime err from bg:', chrome.runtime.lastError.message);
+          renderItems(fallbackData[currentViewMode]);
+          return;
+        }
+        if(r && r.success && r.data) {
+          log.info("Success from bg. Raw data snippet:", r.data.substring(0,200));
+          try {
+            const d = JSON.parse(r.data);
+            log.info("Parsed data from bg:", d);
+            if(d && Array.isArray(d.items)) {
+              if(d.items.length > 0) {
+                log.info("Parsed items count:", d.items.length);
+                renderItems(d.items);
+                // Check notifications for New Listings
+                if (currentViewMode === VIEW_MODES.NEW_LISTINGS) {
+                  checkNotifications(d.items);
+                }
+              } else {
+                log.info("Parsed items empty. Rendering 'No Data'.");
+                renderItems([]);
+              }
+              return;
+            }
+            log.warn('Parsed data.items not array or missing:', d);
+            renderItems([]);
+          } catch(e) {
+            log.error('Error parsing API resp JSON:', e, "Raw data:", r.data);
+            renderItems([]);
+          }
+        } else if(r && r.error) {
+          log.warn('API error from bg:', r.error, "Details:", r.details);
+          renderItems(fallbackData[currentViewMode]);
+        } else {
+          log.warn('Unknown resp from bg:', r);
+          renderItems(fallbackData[currentViewMode]);
+        }
+      } finally {
+        isFetchingData = false;
+        if (callbackOnFinish) callbackOnFinish();
+        log.info("isFetchingData flag reset to false in fetchViaBackground callback.");
+      }
+    });
+  }
   async function initialize() { log.info('Initializing banner script...'); const lockAcquired = await acquireInitLock(); if (!lockAcquired) { log.warn('Could not acquire init lock. Aborted.'); return; } log.info("Init lock acquired."); const oldBanner = document.getElementById('ipv4-banner'); if (oldBanner) { log.warn('Old banner found. Removing.'); try { oldBanner.parentNode.removeChild(oldBanner); bannerCreated = false; } catch(e) { log.error("Error removing old banner:", e); }} try { initialViewportWidth = getViewportWidth(); log.info("Getting settings..."); await getAllSettings(); currentViewMode = await getSavedViewMode(); isMinimized = await getSavedMinimizedState(); log.info("Pre-creation states:", { currentViewMode, isMinimized }); log.info("Creating banner..."); const created = await createBanner(); if (created) { log.info("Banner created successfully in initialize."); if (!isMinimized && hasFetchedData) { const scrollContent = document.getElementById('ipv4-scroll-content'); if (scrollContent && scrollContent.innerHTML !== '') { let contentWidth = 1000; const tempEl = document.createElement('div'); tempEl.style.cssText = 'visibility:hidden;position:absolute;white-space:nowrap;font-size:12px;font-family:Arial,sans-serif;'; const uniqueTickerText = scrollContent.innerHTML.split('&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(10))[0] + '&nbsp;&nbsp;&nbsp;&nbsp;'; tempEl.innerHTML = uniqueTickerText; document.body.appendChild(tempEl); contentWidth = tempEl.scrollWidth; document.body.removeChild(tempEl); if (contentWidth < 100) contentWidth = 1000; log.info("Re-applying animation with updated speed post-initialize."); setupScrollAnimation(scrollContent, contentWidth); } } setTimeout(setupMutationObserver, 1000); if (fetchIntervalId) clearInterval(fetchIntervalId); fetchIntervalId = setInterval(fetchData, CONFIG.refreshInterval); log.info(`Refresh interval set: ${CONFIG.refreshInterval / 1000}s.`); setTimeout(() => { const b = document.getElementById('ipv4-banner'); if (b) { log.info("Final position check."); enforceLeftEdgeGap(b); ensureBannerInViewport(b); }}, 500); } else { log.error("Initialization failed: createBanner() returned false."); releaseInitLock(); } addCleanupListeners(); } catch (e) { log.error('CRITICAL ERROR during main initialization:', e, e.stack); releaseInitLock(); } }
   function setupMutationObserver() { if(!CONFIG.mutationObserverEnabled||isDestroyed||observer)return;try{observer=new MutationObserver(m=>{if(isDestroyed)return;for(const mu of m){if(mu.type==='childList'){const b=document.getElementById('ipv4-banner');if(bannerCreated&&!b && !isDestroyed ){const n=Date.now();if(recreationCount>=CONFIG.recreationMaxCount){log.warn(`Banner removed ${recreationCount} times, giving up.`);return;}if(n-lastRecreationTime<CONFIG.recreationDelay){setTimeout(()=>{if(!bannerExists()&&!isDestroyed){log.warn(`Banner removed, recreating (attempt ${recreationCount+1}) delayed`);recreationCount++;lastRecreationTime=Date.now();createBanner().then(ok => { if(ok && !isMinimized && bannerExists()) fetchData(); });}},CONFIG.recreationDelay);}else{log.warn(`Banner removed, recreating (attempt ${recreationCount+1})`);recreationCount++;lastRecreationTime=n;createBanner().then(ok => { if(ok && !isMinimized && bannerExists()) fetchData(); });}}return;}}});observer.observe(document.body,{childList:true,subtree:false});log.info("MutationObserver setup.");}catch(e){log.warn('Error setup MutationObserver:',e);}}
   function addCleanupListeners() { try{window.addEventListener('pagehide',function(event){cleanup(false, event);});window.addEventListener('beforeunload',function(event){cleanup(false, event);});log.info("Cleanup listeners added.");}catch(e){log.warn('Error setup cleanup listeners:',e);}}
