@@ -191,8 +191,24 @@ class SimpleChart {
         const barWidth = chartWidth / data.length * 0.7;
         const barSpacing = chartWidth / data.length;
 
-        // Store bar center positions as we draw them
+        // Pre-calculate and store ALL bar positions before animation
         const barCenters = [];
+        data.forEach((value, index) => {
+            const x = this.padding.left + index * barSpacing + (barSpacing - barWidth) / 2;
+            const barCenterX = x + barWidth / 2;
+            barCenters.push({ centerX: barCenterX, index: index });
+        });
+
+        // Store metadata immediately so it's available during hover
+        this.chartMetadata = {
+            type: 'bar',
+            data: data,
+            labels: labels,
+            isPriceChart: isPriceChart,
+            barCenters: barCenters,
+            chartTop: this.padding.top,
+            chartBottom: this.height - this.padding.bottom
+        };
 
         this.animate((progress) => {
             // Draw axes
@@ -228,12 +244,6 @@ class SimpleChart {
                 const x = this.padding.left + index * barSpacing + (barSpacing - barWidth) / 2;
                 const y = this.height - this.padding.bottom - barHeight;
 
-                // Store bar center position as we draw it
-                if (progress === 1) {
-                    const barCenterX = x + barWidth / 2;
-                    barCenters.push({ centerX: barCenterX, index: index });
-                }
-
                 // Solid color for bars
                 this.ctx.fillStyle = COLORS.primary;
                 this.ctx.fillRect(x, y, barWidth, barHeight);
@@ -259,19 +269,6 @@ class SimpleChart {
                 const y = this.height - this.padding.bottom + 20;
                 this.ctx.fillText(label, x, y);
             });
-
-            // Store metadata after drawing completes
-            if (progress === 1) {
-                this.chartMetadata = {
-                    type: 'bar',
-                    data: data,
-                    labels: labels,
-                    isPriceChart: isPriceChart,
-                    barCenters: barCenters,
-                    chartTop: this.padding.top,
-                    chartBottom: this.height - this.padding.bottom
-                };
-            }
         });
     }
 
