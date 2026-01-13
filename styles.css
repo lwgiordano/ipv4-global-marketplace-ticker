@@ -299,7 +299,7 @@
 /* Notification Banner Styles */
 #ipv4-notify-banner {
   position: fixed !important;
-  z-index: 2147483647 !important;
+  z-index: 2147483640 !important;
   background-color: #0062ff !important;
   color: white !important;
   padding: 10px 12px !important;
