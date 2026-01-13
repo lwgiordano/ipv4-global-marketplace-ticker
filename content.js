@@ -397,7 +397,36 @@
     });
     submenu.appendChild(optionsItem);
 
-    // 3) Close
+    // 3) Analyze
+    const analysisItem = document.createElement('div');
+    analysisItem.textContent = 'Analyze';
+    analysisItem.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleGearSubmenu(false);
+
+      // Open analysis page via background script
+      if (isChromeAvailable()) {
+        try {
+          chrome.runtime.sendMessage({ type: 'openAnalysis' }, (response) => {
+            if (chrome.runtime.lastError) {
+              log.error('[IPv4 Banner] Error sending openAnalysis message:', chrome.runtime.lastError.message);
+            } else if (!response || response.ok === false) {
+              log.warn('[IPv4 Banner] openAnalysis reported failure:', response && response.error);
+            } else {
+              log.info('[IPv4 Banner] openAnalysis triggered via background.');
+            }
+          });
+        } catch (err) {
+          log.error('[IPv4 Banner] Exception while requesting analysis page:', err);
+        }
+      } else {
+        log.warn('[IPv4 Banner] Chrome API not available, cannot open analysis page');
+      }
+    });
+    submenu.appendChild(analysisItem);
+
+    // 4) Close
     const closeItem = document.createElement('div');
     closeItem.textContent = 'Close';
     closeItem.addEventListener('click', (e) => {

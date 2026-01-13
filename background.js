@@ -15,6 +15,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.type === 'openAnalysis') {
+    console.log('[IPv4 BG] Received openAnalysis request');
+    chrome.tabs.create({ url: chrome.runtime.getURL('analysis.html') }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('[IPv4 BG] openAnalysis failed:', chrome.runtime.lastError.message);
+        sendResponse({ ok: false, error: chrome.runtime.lastError.message });
+      } else {
+        console.log('[IPv4 BG] openAnalysis succeeded');
+        sendResponse({ ok: true });
+      }
+    });
+    // Return true to indicate we'll respond asynchronously
+    return true;
+  }
+
   if (request.type === 'fetchData' && request.url) {
     // Make the network request from the background service worker
     fetch(request.url, {
