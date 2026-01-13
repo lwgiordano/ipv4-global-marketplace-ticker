@@ -486,3 +486,21 @@
     transform: translateY(10px);
   }
 }
+
+/* Slide-in animation for new items */
+.ipv4-notify-slide-in {
+  animation: ipv4-slide-in 0.2s ease-out forwards !important;
+}
+
+@keyframes ipv4-slide-in {
+  from {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    max-height: 50px;
+    transform: translateY(0);
+  }
+}

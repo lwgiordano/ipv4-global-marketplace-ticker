@@ -109,6 +109,7 @@
   let isGearSubmenuOpen = false;
   let notifyBannerVisible = false;
   let notifyBannerAboveTicker = true; // Track if banner is positioned above or below ticker
+  let allPendingNotifications = []; // All matching items for the notification banner
   let dismissedNotifications = {}; // Maps rule IDs to sets of dismissed auction IDs
   let notificationIntervalId = null;
 
@@ -366,29 +367,71 @@
           // Update local state
           dismissedNotifications = newDismissed;
 
+          // Update pending notifications list - remove any that are now dismissed
+          allPendingNotifications = allPendingNotifications.filter(
+            n => !isNotificationDismissed(n.ruleId, n.auctionId)
+          );
+
           // Remove any currently displayed items that are now dismissed
           const banner = document.getElementById('ipv4-notify-banner');
           if (banner && notifyBannerVisible) {
+            const itemsContainer = banner.querySelector('#ipv4-notify-items');
             const closeButtons = banner.querySelectorAll('.ipv4-notify-item-close');
+            const itemsToRemove = [];
+
             closeButtons.forEach(btn => {
               const rid = btn.dataset.ruleId;
               const aid = btn.dataset.auctionId;
               if (rid && aid && isNotificationDismissed(rid, aid)) {
                 const itemEl = btn.closest('.ipv4-notify-item');
                 if (itemEl) {
-                  // Animate and remove
-                  const collapseClass = notifyBannerAboveTicker ? 'ipv4-notify-collapse-down' : 'ipv4-notify-collapse-up';
-                  itemEl.classList.add(collapseClass);
-                  setTimeout(() => {
-                    itemEl.remove();
-                    const itemsContainer = banner.querySelector('#ipv4-notify-items');
-                    if (itemsContainer && itemsContainer.children.length === 0) {
-                      hideNotifyBanner();
-                    }
-                  }, 200);
+                  itemsToRemove.push({ element: itemEl, ruleId: rid, auctionId: aid });
                 }
               }
             });
+
+            // Animate and remove dismissed items, then add next items
+            itemsToRemove.forEach(({ element }) => {
+              const collapseClass = notifyBannerAboveTicker ? 'ipv4-notify-collapse-down' : 'ipv4-notify-collapse-up';
+              element.classList.add(collapseClass);
+            });
+
+            setTimeout(() => {
+              itemsToRemove.forEach(({ element }) => element.remove());
+
+              if (itemsContainer) {
+                // Add next items from queue if there's space
+                const displayedCount = itemsContainer.children.length;
+                const itemsToAdd = 3 - displayedCount;
+
+                if (itemsToAdd > 0 && allPendingNotifications.length > displayedCount) {
+                  const displayedIds = new Set();
+                  itemsContainer.querySelectorAll('.ipv4-notify-item-close').forEach(btn => {
+                    displayedIds.add(`${btn.dataset.ruleId}_${btn.dataset.auctionId}`);
+                  });
+
+                  let added = 0;
+                  for (const n of allPendingNotifications) {
+                    if (added >= itemsToAdd) break;
+                    if (!displayedIds.has(`${n.ruleId}_${n.auctionId}`)) {
+                      const newItemEl = createNotifyItemElement(n.item, n.ruleId, n.auctionId);
+                      newItemEl.classList.add('ipv4-notify-slide-in');
+                      itemsContainer.appendChild(newItemEl);
+                      added++;
+                    }
+                  }
+                }
+
+                // Update count
+                updateNotifyCount();
+
+                // Hide banner if no items left
+                if (itemsContainer.children.length === 0) {
+                  banner.classList.remove('ipv4-notify-visible');
+                  notifyBannerVisible = false;
+                }
+              }
+            }, 200);
           }
         }
       });
@@ -508,25 +551,116 @@
     }
   }
 
+  function createNotifyItemElement(item, ruleId, auctionId) {
+    const priceFieldsToTry = ['askingPrice', 'price', 'pricePerAddress', 'listPrice'];
+    let priceStr = '';
+    for (const field of priceFieldsToTry) {
+      priceStr = getValidPriceString(item, field);
+      if (priceStr && priceStr !== '$') break;
+    }
+
+    const itemEl = document.createElement('div');
+    itemEl.className = 'ipv4-notify-item';
+    itemEl.innerHTML = `
+      <div class="ipv4-notify-item-info">
+        <span>/${item.block || '?'}</span>
+        <span>${(item.region || '').toUpperCase()}</span>
+        <span>${priceStr || '$?'}</span>
+      </div>
+      <div class="ipv4-notify-item-actions">
+        ${auctionId ? `<a href="https://auctions.ipv4.global/auction/${auctionId}" target="_blank" class="ipv4-notify-item-link">View</a>` : ''}
+        <button class="ipv4-notify-item-close" data-rule-id="${ruleId}" data-auction-id="${auctionId}">×</button>
+      </div>
+    `;
+
+    // Add click handler to dismiss when viewing
+    const link = itemEl.querySelector('.ipv4-notify-item-link');
+    if (link) {
+      link.addEventListener('click', () => {
+        if (ruleId && auctionId) dismissNotification(ruleId, auctionId);
+      });
+    }
+
+    // Add click handler for individual X button
+    const closeBtn = itemEl.querySelector('.ipv4-notify-item-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        removeNotifyItem(itemEl, ruleId, auctionId);
+      });
+    }
+
+    return itemEl;
+  }
+
+  function updateNotifyCount() {
+    const banner = document.getElementById('ipv4-notify-banner');
+    if (!banner) return;
+
+    const countEl = banner.querySelector('#ipv4-notify-count');
+    const itemsContainer = banner.querySelector('#ipv4-notify-items');
+    if (!countEl || !itemsContainer) return;
+
+    const displayedCount = itemsContainer.children.length;
+    const remainingCount = allPendingNotifications.length - displayedCount;
+
+    if (remainingCount > 0) {
+      countEl.textContent = `+${remainingCount} more matching listings`;
+      countEl.style.display = 'block';
+    } else {
+      countEl.style.display = 'none';
+    }
+  }
+
   function removeNotifyItem(itemEl, ruleId, auctionId) {
     // Dismiss this notification so it doesn't appear again
     if (ruleId && auctionId) {
       dismissNotification(ruleId, auctionId);
     }
 
+    // Remove from pending list
+    allPendingNotifications = allPendingNotifications.filter(
+      n => !(n.ruleId === ruleId && n.auctionId === auctionId)
+    );
+
     // Animate collapse based on banner position
-    // Below ticker = collapse up (toward header at top)
-    // Above ticker = collapse down (toward header at bottom)
     const collapseClass = notifyBannerAboveTicker ? 'ipv4-notify-collapse-down' : 'ipv4-notify-collapse-up';
     itemEl.classList.add(collapseClass);
 
-    // Remove after animation completes
+    // Remove after animation completes and show next item if available
     setTimeout(() => {
       itemEl.remove();
-      // Check if banner should be hidden (no items left)
+
       const banner = document.getElementById('ipv4-notify-banner');
       const itemsContainer = banner ? banner.querySelector('#ipv4-notify-items') : null;
-      if (itemsContainer && itemsContainer.children.length === 0) {
+
+      if (!itemsContainer) return;
+
+      // Check if we should add the next item from the queue
+      const displayedCount = itemsContainer.children.length;
+      if (displayedCount < 3 && allPendingNotifications.length > displayedCount) {
+        // Find items not currently displayed
+        const displayedIds = new Set();
+        itemsContainer.querySelectorAll('.ipv4-notify-item-close').forEach(btn => {
+          displayedIds.add(`${btn.dataset.ruleId}_${btn.dataset.auctionId}`);
+        });
+
+        // Get next item to display
+        const nextItem = allPendingNotifications.find(
+          n => !displayedIds.has(`${n.ruleId}_${n.auctionId}`)
+        );
+
+        if (nextItem) {
+          const newItemEl = createNotifyItemElement(nextItem.item, nextItem.ruleId, nextItem.auctionId);
+          newItemEl.classList.add('ipv4-notify-slide-in');
+          itemsContainer.appendChild(newItemEl);
+        }
+      }
+
+      // Update the count
+      updateNotifyCount();
+
+      // Hide banner if no items left
+      if (itemsContainer.children.length === 0) {
         hideNotifyBanner();
       }
     }, 200);
@@ -537,62 +671,22 @@
     if (!banner) return;
 
     const itemsContainer = banner.querySelector('#ipv4-notify-items');
-    const countEl = banner.querySelector('#ipv4-notify-count');
-
     if (!itemsContainer) return;
+
+    // Store all matching items for later use (when dismissing shows next item)
+    allPendingNotifications = [...matchingItems];
 
     itemsContainer.innerHTML = '';
 
     // Show up to 3 items
     const displayItems = matchingItems.slice(0, 3);
     displayItems.forEach(({ item, ruleId, auctionId }) => {
-      const priceFieldsToTry = ['askingPrice', 'price', 'pricePerAddress', 'listPrice'];
-      let priceStr = '';
-      for (const field of priceFieldsToTry) {
-        priceStr = getValidPriceString(item, field);
-        if (priceStr && priceStr !== '$') break;
-      }
-
-      const itemEl = document.createElement('div');
-      itemEl.className = 'ipv4-notify-item';
-      itemEl.innerHTML = `
-        <div class="ipv4-notify-item-info">
-          <span>/${item.block || '?'}</span>
-          <span>${(item.region || '').toUpperCase()}</span>
-          <span>${priceStr || '$?'}</span>
-        </div>
-        <div class="ipv4-notify-item-actions">
-          ${auctionId ? `<a href="https://auctions.ipv4.global/auction/${auctionId}" target="_blank" class="ipv4-notify-item-link">View</a>` : ''}
-          <button class="ipv4-notify-item-close" data-rule-id="${ruleId}" data-auction-id="${auctionId}">×</button>
-        </div>
-      `;
-
-      // Add click handler to dismiss when viewing
-      const link = itemEl.querySelector('.ipv4-notify-item-link');
-      if (link) {
-        link.addEventListener('click', () => {
-          if (ruleId && auctionId) dismissNotification(ruleId, auctionId);
-        });
-      }
-
-      // Add click handler for individual X button
-      const closeBtn = itemEl.querySelector('.ipv4-notify-item-close');
-      if (closeBtn) {
-        closeBtn.addEventListener('click', () => {
-          removeNotifyItem(itemEl, ruleId, auctionId);
-        });
-      }
-
+      const itemEl = createNotifyItemElement(item, ruleId, auctionId);
       itemsContainer.appendChild(itemEl);
     });
 
-    // Show count if more items
-    if (matchingItems.length > 3) {
-      countEl.textContent = `+${matchingItems.length - 3} more matching listings`;
-      countEl.style.display = 'block';
-    } else {
-      countEl.style.display = 'none';
-    }
+    // Update count display
+    updateNotifyCount();
 
     banner.classList.add('ipv4-notify-visible');
     notifyBannerVisible = true;
@@ -603,13 +697,12 @@
     const banner = document.getElementById('ipv4-notify-banner');
     if (banner) {
       banner.classList.remove('ipv4-notify-visible');
-      // Dismiss all currently displayed items using close button data
-      const closeButtons = banner.querySelectorAll('.ipv4-notify-item-close');
-      closeButtons.forEach(btn => {
-        const rid = btn.dataset.ruleId;
-        const aid = btn.dataset.auctionId;
-        if (rid && aid) dismissNotification(rid, aid);
+      // Dismiss ALL pending notifications (not just displayed) for cross-tab sync
+      allPendingNotifications.forEach(({ ruleId, auctionId }) => {
+        if (ruleId && auctionId) dismissNotification(ruleId, auctionId);
       });
+      // Clear the pending list
+      allPendingNotifications = [];
     }
     notifyBannerVisible = false;
   }
