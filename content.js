@@ -579,7 +579,12 @@
   }
 
   async function checkNotifications(items) {
-    if (!items || items.length === 0) return;
+    if (!items || items.length === 0) {
+      log.info('checkNotifications: No items to check');
+      return;
+    }
+
+    log.info('checkNotifications: Checking', items.length, 'items');
 
     try {
       const enabled = await getSetting(CONFIG.notifyMeEnabledKey, false);
@@ -589,6 +594,7 @@
       }
 
       const rules = await getSetting(CONFIG.notifyMeRulesKey, []);
+      log.info('Notification rules:', rules);
       if (!rules || rules.length === 0) {
         log.info('No notification rules configured');
         return;
@@ -603,19 +609,27 @@
       const matchedRules = new Set();
 
       for (const item of items) {
-        const auctionId = getAuctionId(item);
-        if (!auctionId) continue;
+        const auctionId = getAuctionId(item) || `item_${item.block}_${item.region}_${Date.now()}`;
 
         for (const rule of rules) {
           // Skip if already dismissed for this rule
-          if (isNotificationDismissed(rule.id, auctionId)) continue;
+          if (isNotificationDismissed(rule.id, auctionId)) {
+            log.info('Item already dismissed:', auctionId);
+            continue;
+          }
 
-          if (itemMatchesRule(item, rule)) {
+          const matches = itemMatchesRule(item, rule);
+          log.info('Item match check:', { item: { block: item.block, region: item.region, price: item.askingPrice || item.pricePerAddress }, rule, matches });
+
+          if (matches) {
             matchingItems.push({ item, ruleId: rule.id, auctionId });
             matchedRules.add(rule.id);
+            break; // Only match one rule per item
           }
         }
       }
+
+      log.info('Matching items found:', matchingItems.length);
 
       if (matchingItems.length > 0) {
         log.info(`Found ${matchingItems.length} matching items for notifications`);
@@ -629,15 +643,20 @@
 
   // Fetch new listings specifically for notification checking
   async function fetchNewListingsForNotifications() {
+    log.info('fetchNewListingsForNotifications called');
+
     const enabled = await getSetting(CONFIG.notifyMeEnabledKey, false);
+    log.info('Notifications enabled:', enabled);
     if (!enabled) return;
 
     const rules = await getSetting(CONFIG.notifyMeRulesKey, []);
+    log.info('Notification rules count:', rules ? rules.length : 0);
     if (!rules || rules.length === 0) return;
 
-    log.info('Fetching new listings for notification check...');
-
-    if (!isChromeAvailable()) return;
+    if (!isChromeAvailable()) {
+      log.warn('Chrome not available for notification fetch');
+      return;
+    }
 
     try {
       // Build request body for new listings (no period filter)
@@ -651,6 +670,8 @@
         limit: 50
       };
 
+      log.info('Sending notification fetch request to:', CONFIG.newListingsApi);
+
       chrome.runtime.sendMessage({
         type: 'fetchData',
         url: CONFIG.newListingsApi,
@@ -661,12 +682,20 @@
             log.warn('Notification fetch error:', chrome.runtime.lastError.message);
             return;
           }
+          log.info('Notification fetch response:', r ? 'success=' + r.success : 'null');
           if (r && r.success && r.data) {
             const d = JSON.parse(r.data);
-            if (d && Array.isArray(d.items) && d.items.length > 0) {
+            if (d && Array.isArray(d.items)) {
               log.info('Notification check: Got', d.items.length, 'new listings');
-              checkNotifications(d.items);
+              if (d.items.length > 0) {
+                log.info('First item sample:', JSON.stringify(d.items[0]).substring(0, 200));
+                checkNotifications(d.items);
+              }
+            } else {
+              log.warn('No items array in response:', d);
             }
+          } else {
+            log.warn('Invalid response:', r);
           }
         } catch (e) {
           log.error('Error in notification fetch callback:', e);
