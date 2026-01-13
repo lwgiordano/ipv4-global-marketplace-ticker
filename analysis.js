@@ -100,20 +100,48 @@ class SimpleChart {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        // For bar charts, check in reverse order (rightmost bars first) to handle any overlaps
-        for (let i = this.dataPoints.length - 1; i >= 0; i--) {
-            const point = this.dataPoints[i];
+        // For bar charts, calculate which bar is under the mouse
+        if (this.chartMetadata && this.chartMetadata.type === 'bar') {
+            const meta = this.chartMetadata;
 
-            // For bar charts - check using left/right/top/bottom properties
-            if (point.left !== undefined && point.right !== undefined && point.top !== undefined && point.bottom !== undefined) {
-                // Check if mouse is within the bar boundaries
-                if (x >= point.left && x <= point.right && y >= point.top && y <= point.bottom) {
-                    this.showTooltip(point, e.clientX, e.clientY);
-                    return;
-                }
+            // Check if mouse is in chart area vertically
+            if (y < meta.chartTop || y > meta.chartBottom) {
+                this.hideTooltip();
+                return;
             }
-            // For pie and line charts - check using x/y/radius properties
-            else if (point.x !== undefined && point.y !== undefined && point.radius !== undefined) {
+
+            // Calculate which bar index based on X position
+            const relativeX = x - meta.chartLeft;
+            if (relativeX < 0 || relativeX > meta.barSpacing * meta.numBars) {
+                this.hideTooltip();
+                return;
+            }
+
+            // Find which bar space we're in
+            const barIndex = Math.floor(relativeX / meta.barSpacing);
+            if (barIndex < 0 || barIndex >= meta.numBars) {
+                this.hideTooltip();
+                return;
+            }
+
+            // Calculate the actual bar boundaries for this index
+            const barLeft = meta.chartLeft + barIndex * meta.barSpacing + (meta.barSpacing - meta.barWidth) / 2;
+            const barRight = barLeft + meta.barWidth;
+
+            // Check if mouse is actually over the bar (not just in its space)
+            if (x >= barLeft && x <= barRight) {
+                const value = meta.data[barIndex];
+                const formattedValue = meta.isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
+                const label = `${meta.labels[barIndex]}: ${formattedValue}`;
+
+                this.showTooltip({ label: label }, e.clientX, e.clientY);
+                return;
+            }
+        }
+
+        // For pie and line charts - check stored data points
+        for (const point of this.dataPoints) {
+            if (point.x !== undefined && point.y !== undefined && point.radius !== undefined) {
                 const distance = Math.sqrt(Math.pow(x - point.x, 2) + Math.pow(y - point.y, 2));
                 if (distance < point.radius) {
                     this.showTooltip(point, e.clientX, e.clientY);
@@ -121,6 +149,7 @@ class SimpleChart {
                 }
             }
         }
+
         this.hideTooltip();
     }
 
@@ -167,6 +196,20 @@ class SimpleChart {
         const barWidth = chartWidth / data.length * 0.7;
         const barSpacing = chartWidth / data.length;
 
+        // Store chart metadata for hover detection
+        this.chartMetadata = {
+            type: 'bar',
+            data: data,
+            labels: labels,
+            isPriceChart: isPriceChart,
+            barWidth: barWidth,
+            barSpacing: barSpacing,
+            chartLeft: this.padding.left,
+            chartTop: this.padding.top,
+            chartBottom: this.height - this.padding.bottom,
+            numBars: data.length
+        };
+
         this.animate((progress) => {
             // Draw axes
             this.ctx.strokeStyle = COLORS.grid;
@@ -204,21 +247,6 @@ class SimpleChart {
                 // Solid color for bars
                 this.ctx.fillStyle = COLORS.primary;
                 this.ctx.fillRect(x, y, barWidth, barHeight);
-
-                // Add to data points for tooltip - store exact bar boundaries
-                if (progress === 1) {
-                    const formattedValue = isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
-                    // Add small horizontal padding for easier clicking, but constrain to bar spacing
-                    const hPadding = Math.min(3, (barSpacing - barWidth) / 2);
-                    this.dataPoints.push({
-                        left: x - hPadding,
-                        right: x + barWidth + hPadding,
-                        top: y,
-                        bottom: this.height - this.padding.bottom,
-                        label: `${labels[index]}: ${formattedValue}`,
-                        isBar: true
-                    });
-                }
 
                 // Draw value on top of bar (only when fully animated)
                 if (progress > 0.7) {
