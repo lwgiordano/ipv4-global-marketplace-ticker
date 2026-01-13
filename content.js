@@ -404,7 +404,6 @@
     banner.innerHTML = `
       <div id="ipv4-notify-header">
         <span id="ipv4-notify-title">New Listing Match!</span>
-        <button id="ipv4-notify-close">×</button>
       </div>
       <div id="ipv4-notify-content">
         <div id="ipv4-notify-items"></div>
@@ -412,12 +411,6 @@
       </div>
     `;
     document.body.appendChild(banner);
-
-    // Add close button handler
-    const closeBtn = banner.querySelector('#ipv4-notify-close');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', hideNotifyBanner);
-    }
 
     return banner;
   }
@@ -429,20 +422,51 @@
 
     const tickerRect = tickerBanner.getBoundingClientRect();
     const tickerStyle = window.getComputedStyle(tickerBanner);
+    const notifyHeight = notifyBanner.offsetHeight || 150;
+    const viewportHeight = window.innerHeight;
 
     // Match ticker's right position
     notifyBanner.style.right = tickerStyle.right;
 
-    // Position above the ticker
-    notifyBanner.style.bottom = (window.innerHeight - tickerRect.top + 8) + 'px';
-    notifyBanner.style.top = 'auto';
+    // Check space above and below
+    const spaceAbove = tickerRect.top;
+    const spaceBelow = viewportHeight - tickerRect.bottom;
 
-    // Match ticker width
-    notifyBanner.style.width = tickerRect.width + 'px';
+    // Position based on available space
+    if (spaceAbove >= notifyHeight + 10) {
+      // Enough room above - position above
+      notifyBanner.style.bottom = (viewportHeight - tickerRect.top + 8) + 'px';
+      notifyBanner.style.top = 'auto';
+    } else if (spaceBelow >= notifyHeight + 10) {
+      // Not enough room above but enough below - position below
+      notifyBanner.style.top = (tickerRect.bottom + 8) + 'px';
+      notifyBanner.style.bottom = 'auto';
+    } else {
+      // Not enough room either way - position above anyway
+      notifyBanner.style.bottom = (viewportHeight - tickerRect.top + 8) + 'px';
+      notifyBanner.style.top = 'auto';
+    }
+  }
+
+  function removeNotifyItem(itemEl, ruleId, auctionId) {
+    // Dismiss this notification so it doesn't appear again
+    if (ruleId && auctionId) {
+      dismissNotification(ruleId, auctionId);
+    }
+    // Remove the item from DOM
+    itemEl.remove();
+    // Check if banner should be hidden (no items left)
+    const banner = document.getElementById('ipv4-notify-banner');
+    const itemsContainer = banner ? banner.querySelector('#ipv4-notify-items') : null;
+    if (itemsContainer && itemsContainer.children.length === 0) {
+      hideNotifyBanner();
+    }
   }
 
   function showNotifyBanner(matchingItems, matchedRules) {
     const banner = createNotifyBanner();
+    if (!banner) return;
+
     const itemsContainer = banner.querySelector('#ipv4-notify-items');
     const countEl = banner.querySelector('#ipv4-notify-count');
 
@@ -450,10 +474,9 @@
 
     itemsContainer.innerHTML = '';
 
-    // Show up to 5 items
-    const displayItems = matchingItems.slice(0, 5);
-    displayItems.forEach(({ item, ruleId }) => {
-      const auctionId = getAuctionId(item);
+    // Show up to 3 items
+    const displayItems = matchingItems.slice(0, 3);
+    displayItems.forEach(({ item, ruleId, auctionId }) => {
       const priceFieldsToTry = ['askingPrice', 'price', 'pricePerAddress', 'listPrice'];
       let priceStr = '';
       for (const field of priceFieldsToTry) {
@@ -469,16 +492,25 @@
           <span>${(item.region || '').toUpperCase()}</span>
           <span>${priceStr || '$?'}</span>
         </div>
-        ${auctionId ? `<a href="https://auctions.ipv4.global/auction/${auctionId}" target="_blank" class="ipv4-notify-item-link" data-rule-id="${ruleId}" data-auction-id="${auctionId}">View →</a>` : ''}
+        <div class="ipv4-notify-item-actions">
+          ${auctionId ? `<a href="https://auctions.ipv4.global/auction/${auctionId}" target="_blank" class="ipv4-notify-item-link">View</a>` : ''}
+          <button class="ipv4-notify-item-close" data-rule-id="${ruleId}" data-auction-id="${auctionId}">×</button>
+        </div>
       `;
 
       // Add click handler to dismiss when viewing
       const link = itemEl.querySelector('.ipv4-notify-item-link');
       if (link) {
-        link.addEventListener('click', (e) => {
-          const rid = e.target.dataset.ruleId;
-          const aid = e.target.dataset.auctionId;
-          if (rid && aid) dismissNotification(rid, aid);
+        link.addEventListener('click', () => {
+          if (ruleId && auctionId) dismissNotification(ruleId, auctionId);
+        });
+      }
+
+      // Add click handler for individual X button
+      const closeBtn = itemEl.querySelector('.ipv4-notify-item-close');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+          removeNotifyItem(itemEl, ruleId, auctionId);
         });
       }
 
@@ -486,8 +518,8 @@
     });
 
     // Show count if more items
-    if (matchingItems.length > 5) {
-      countEl.textContent = `+${matchingItems.length - 5} more matching listings`;
+    if (matchingItems.length > 3) {
+      countEl.textContent = `+${matchingItems.length - 3} more matching listings`;
       countEl.style.display = 'block';
     } else {
       countEl.style.display = 'none';
@@ -502,11 +534,11 @@
     const banner = document.getElementById('ipv4-notify-banner');
     if (banner) {
       banner.classList.remove('ipv4-notify-visible');
-      // Dismiss all currently displayed items
-      const links = banner.querySelectorAll('.ipv4-notify-item-link');
-      links.forEach(link => {
-        const rid = link.dataset.ruleId;
-        const aid = link.dataset.auctionId;
+      // Dismiss all currently displayed items using close button data
+      const closeButtons = banner.querySelectorAll('.ipv4-notify-item-close');
+      closeButtons.forEach(btn => {
+        const rid = btn.dataset.ruleId;
+        const aid = btn.dataset.auctionId;
         if (rid && aid) dismissNotification(rid, aid);
       });
     }

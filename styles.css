@@ -302,12 +302,12 @@
   z-index: 2147483647 !important;
   background-color: #0062ff !important;
   color: white !important;
-  padding: 8px 12px !important;
+  padding: 10px 12px !important;
   border-radius: 4px !important;
   box-shadow: 0 2px 8px rgba(0, 98, 255, 0.3) !important;
   font-family: Arial, sans-serif !important;
   font-size: 12px !important;
-  min-width: 200px !important;
+  width: 280px !important;
   display: none;
   animation: ipv4-notify-slide-down 0.3s ease-out !important;
 }
@@ -331,12 +331,14 @@
   display: flex !important;
   justify-content: space-between !important;
   align-items: center !important;
-  margin-bottom: 6px !important;
+  margin-bottom: 8px !important;
+  padding-bottom: 6px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
 }
 
 #ipv4-notify-title {
   font-weight: bold !important;
-  font-size: 12px !important;
+  font-size: 13px !important;
   display: flex !important;
   align-items: center !important;
   gap: 5px !important;
@@ -346,8 +348,62 @@
   content: '' !important;
 }
 
-#ipv4-notify-close {
-  background: rgba(255, 255, 255, 0.2) !important;
+#ipv4-notify-content {
+  margin-bottom: 0 !important;
+  line-height: 1.3 !important;
+}
+
+#ipv4-notify-items {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  max-height: none !important;
+  overflow-y: visible !important;
+}
+
+.ipv4-notify-item {
+  background: rgba(255, 255, 255, 0.15) !important;
+  padding: 8px 10px !important;
+  border-radius: 4px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+}
+
+.ipv4-notify-item-info {
+  display: flex !important;
+  gap: 8px !important;
+  font-weight: bold !important;
+  font-size: 12px !important;
+  flex: 1 !important;
+}
+
+.ipv4-notify-item-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-shrink: 0 !important;
+}
+
+.ipv4-notify-item-link {
+  color: #0062ff !important;
+  background: white !important;
+  text-decoration: none !important;
+  font-size: 11px !important;
+  font-weight: bold !important;
+  cursor: pointer !important;
+  padding: 4px 10px !important;
+  border-radius: 3px !important;
+  transition: background 0.2s, color 0.2s !important;
+}
+
+.ipv4-notify-item-link:hover {
+  background: #e6f0ff !important;
+  color: #0051d4 !important;
+}
+
+.ipv4-notify-item-close {
+  background: rgba(255, 255, 255, 0.3) !important;
   border: none !important;
   color: white !important;
   width: 18px !important;
@@ -363,52 +419,13 @@
   padding: 0 !important;
 }
 
-#ipv4-notify-close:hover {
-  background: rgba(255, 255, 255, 0.4) !important;
-}
-
-#ipv4-notify-content {
-  margin-bottom: 0 !important;
-  line-height: 1.3 !important;
-}
-
-#ipv4-notify-items {
-  display: flex !important;
-  flex-direction: row !important;
-  flex-wrap: wrap !important;
-  gap: 6px !important;
-  max-height: 120px !important;
-  overflow-y: auto !important;
-}
-
-.ipv4-notify-item {
-  background: rgba(255, 255, 255, 0.15) !important;
-  padding: 5px 8px !important;
-  border-radius: 3px !important;
-  display: flex !important;
-  justify-content: space-between !important;
-  align-items: center !important;
-}
-
-.ipv4-notify-item-info {
-  display: flex !important;
-  gap: 10px !important;
-  font-weight: bold !important;
-}
-
-.ipv4-notify-item-link {
-  color: white !important;
-  text-decoration: underline !important;
-  font-size: 12px !important;
-  cursor: pointer !important;
-}
-
-.ipv4-notify-item-link:hover {
-  color: #cce5ff !important;
+.ipv4-notify-item-close:hover {
+  background: rgba(255, 255, 255, 0.5) !important;
 }
 
 #ipv4-notify-count {
-  font-size: 12px !important;
+  font-size: 11px !important;
   opacity: 0.9 !important;
-  margin-top: 6px !important;
+  margin-top: 8px !important;
+  text-align: center !important;
 }
