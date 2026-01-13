@@ -445,3 +445,44 @@
   margin-top: 8px !important;
   text-align: center !important;
 }
+
+/* Collapse animations based on banner position */
+.ipv4-notify-collapse-up {
+  animation: ipv4-collapse-up 0.2s ease-out forwards !important;
+}
+
+.ipv4-notify-collapse-down {
+  animation: ipv4-collapse-down 0.2s ease-out forwards !important;
+}
+
+@keyframes ipv4-collapse-up {
+  from {
+    opacity: 1;
+    max-height: 50px;
+    margin-bottom: 6px;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    max-height: 0;
+    margin-bottom: 0;
+    padding: 0;
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes ipv4-collapse-down {
+  from {
+    opacity: 1;
+    max-height: 50px;
+    margin-top: 0;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    max-height: 0;
+    margin-top: 0;
+    padding: 0;
+    transform: translateY(10px);
+  }
+}

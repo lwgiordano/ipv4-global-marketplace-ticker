@@ -108,6 +108,7 @@
   let isFetchingData = false;
   let isGearSubmenuOpen = false;
   let notifyBannerVisible = false;
+  let notifyBannerAboveTicker = true; // Track if banner is positioned above or below ticker
   let dismissedNotifications = {}; // Maps rule IDs to sets of dismissed auction IDs
   let notificationIntervalId = null;
 
@@ -354,6 +355,47 @@
     }
   }
 
+  // Cross-tab sync: Listen for storage changes and update UI
+  function setupDismissedNotificationSync() {
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+      chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName === 'local' && changes[CONFIG.notifyMeDismissedKey]) {
+          const newDismissed = changes[CONFIG.notifyMeDismissedKey].newValue || {};
+          log.info('Dismissed notifications changed from another tab:', newDismissed);
+
+          // Update local state
+          dismissedNotifications = newDismissed;
+
+          // Remove any currently displayed items that are now dismissed
+          const banner = document.getElementById('ipv4-notify-banner');
+          if (banner && notifyBannerVisible) {
+            const closeButtons = banner.querySelectorAll('.ipv4-notify-item-close');
+            closeButtons.forEach(btn => {
+              const rid = btn.dataset.ruleId;
+              const aid = btn.dataset.auctionId;
+              if (rid && aid && isNotificationDismissed(rid, aid)) {
+                const itemEl = btn.closest('.ipv4-notify-item');
+                if (itemEl) {
+                  // Animate and remove
+                  const collapseClass = notifyBannerAboveTicker ? 'ipv4-notify-collapse-down' : 'ipv4-notify-collapse-up';
+                  itemEl.classList.add(collapseClass);
+                  setTimeout(() => {
+                    itemEl.remove();
+                    const itemsContainer = banner.querySelector('#ipv4-notify-items');
+                    if (itemsContainer && itemsContainer.children.length === 0) {
+                      hideNotifyBanner();
+                    }
+                  }, 200);
+                }
+              }
+            });
+          }
+        }
+      });
+      log.info('Cross-tab notification sync listener set up');
+    }
+  }
+
   function itemMatchesRule(item, rule) {
     // Check block size
     if (rule.blockSize && rule.blockSize !== '') {
@@ -446,14 +488,23 @@
       // Enough room above - position above
       notifyBanner.style.bottom = (viewportHeight - tickerRect.top + 8) + 'px';
       notifyBanner.style.top = 'auto';
+      notifyBannerAboveTicker = true;
+      notifyBanner.classList.add('ipv4-notify-above');
+      notifyBanner.classList.remove('ipv4-notify-below');
     } else if (spaceBelow >= notifyHeight + 10) {
       // Not enough room above but enough below - position below
       notifyBanner.style.top = (tickerRect.bottom + 8) + 'px';
       notifyBanner.style.bottom = 'auto';
+      notifyBannerAboveTicker = false;
+      notifyBanner.classList.add('ipv4-notify-below');
+      notifyBanner.classList.remove('ipv4-notify-above');
     } else {
       // Not enough room either way - position above anyway
       notifyBanner.style.bottom = (viewportHeight - tickerRect.top + 8) + 'px';
       notifyBanner.style.top = 'auto';
+      notifyBannerAboveTicker = true;
+      notifyBanner.classList.add('ipv4-notify-above');
+      notifyBanner.classList.remove('ipv4-notify-below');
     }
   }
 
@@ -462,14 +513,23 @@
     if (ruleId && auctionId) {
       dismissNotification(ruleId, auctionId);
     }
-    // Remove the item from DOM
-    itemEl.remove();
-    // Check if banner should be hidden (no items left)
-    const banner = document.getElementById('ipv4-notify-banner');
-    const itemsContainer = banner ? banner.querySelector('#ipv4-notify-items') : null;
-    if (itemsContainer && itemsContainer.children.length === 0) {
-      hideNotifyBanner();
-    }
+
+    // Animate collapse based on banner position
+    // Below ticker = collapse up (toward header at top)
+    // Above ticker = collapse down (toward header at bottom)
+    const collapseClass = notifyBannerAboveTicker ? 'ipv4-notify-collapse-down' : 'ipv4-notify-collapse-up';
+    itemEl.classList.add(collapseClass);
+
+    // Remove after animation completes
+    setTimeout(() => {
+      itemEl.remove();
+      // Check if banner should be hidden (no items left)
+      const banner = document.getElementById('ipv4-notify-banner');
+      const itemsContainer = banner ? banner.querySelector('#ipv4-notify-items') : null;
+      if (itemsContainer && itemsContainer.children.length === 0) {
+        hideNotifyBanner();
+      }
+    }, 200);
   }
 
   function showNotifyBanner(matchingItems, matchedRules) {
@@ -1368,7 +1428,7 @@
       }
     });
   }
-  async function initialize() { log.info('Initializing banner script...'); const lockAcquired = await acquireInitLock(); if (!lockAcquired) { log.warn('Could not acquire init lock. Aborted.'); return; } log.info("Init lock acquired."); const oldBanner = document.getElementById('ipv4-banner'); if (oldBanner) { log.warn('Old banner found. Removing.'); try { oldBanner.parentNode.removeChild(oldBanner); bannerCreated = false; } catch(e) { log.error("Error removing old banner:", e); }} try { initialViewportWidth = getViewportWidth(); log.info("Getting settings..."); await getAllSettings(); currentViewMode = await getSavedViewMode(); isMinimized = await getSavedMinimizedState(); log.info("Pre-creation states:", { currentViewMode, isMinimized }); log.info("Creating banner..."); const created = await createBanner(); if (created) { log.info("Banner created successfully in initialize."); if (!isMinimized && hasFetchedData) { const scrollContent = document.getElementById('ipv4-scroll-content'); if (scrollContent && scrollContent.innerHTML !== '') { let contentWidth = 1000; const tempEl = document.createElement('div'); tempEl.style.cssText = 'visibility:hidden;position:absolute;white-space:nowrap;font-size:12px;font-family:Arial,sans-serif;'; const uniqueTickerText = scrollContent.innerHTML.split('&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(10))[0] + '&nbsp;&nbsp;&nbsp;&nbsp;'; tempEl.innerHTML = uniqueTickerText; document.body.appendChild(tempEl); contentWidth = tempEl.scrollWidth; document.body.removeChild(tempEl); if (contentWidth < 100) contentWidth = 1000; log.info("Re-applying animation with updated speed post-initialize."); setupScrollAnimation(scrollContent, contentWidth); } } setTimeout(setupMutationObserver, 1000); if (fetchIntervalId) clearInterval(fetchIntervalId); fetchIntervalId = setInterval(fetchData, CONFIG.refreshInterval); log.info(`Refresh interval set: ${CONFIG.refreshInterval / 1000}s.`); if (notificationIntervalId) clearInterval(notificationIntervalId); notificationIntervalId = setInterval(fetchNewListingsForNotifications, CONFIG.refreshInterval); setTimeout(fetchNewListingsForNotifications, 3000); log.info('Notification check interval set.'); setTimeout(() => { const b = document.getElementById('ipv4-banner'); if (b) { log.info("Final position check."); enforceLeftEdgeGap(b); ensureBannerInViewport(b); }}, 500); } else { log.error("Initialization failed: createBanner() returned false."); releaseInitLock(); } addCleanupListeners(); } catch (e) { log.error('CRITICAL ERROR during main initialization:', e, e.stack); releaseInitLock(); } }
+  async function initialize() { log.info('Initializing banner script...'); const lockAcquired = await acquireInitLock(); if (!lockAcquired) { log.warn('Could not acquire init lock. Aborted.'); return; } log.info("Init lock acquired."); const oldBanner = document.getElementById('ipv4-banner'); if (oldBanner) { log.warn('Old banner found. Removing.'); try { oldBanner.parentNode.removeChild(oldBanner); bannerCreated = false; } catch(e) { log.error("Error removing old banner:", e); }} try { initialViewportWidth = getViewportWidth(); log.info("Getting settings..."); await getAllSettings(); currentViewMode = await getSavedViewMode(); isMinimized = await getSavedMinimizedState(); log.info("Pre-creation states:", { currentViewMode, isMinimized }); log.info("Creating banner..."); const created = await createBanner(); if (created) { log.info("Banner created successfully in initialize."); if (!isMinimized && hasFetchedData) { const scrollContent = document.getElementById('ipv4-scroll-content'); if (scrollContent && scrollContent.innerHTML !== '') { let contentWidth = 1000; const tempEl = document.createElement('div'); tempEl.style.cssText = 'visibility:hidden;position:absolute;white-space:nowrap;font-size:12px;font-family:Arial,sans-serif;'; const uniqueTickerText = scrollContent.innerHTML.split('&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(10))[0] + '&nbsp;&nbsp;&nbsp;&nbsp;'; tempEl.innerHTML = uniqueTickerText; document.body.appendChild(tempEl); contentWidth = tempEl.scrollWidth; document.body.removeChild(tempEl); if (contentWidth < 100) contentWidth = 1000; log.info("Re-applying animation with updated speed post-initialize."); setupScrollAnimation(scrollContent, contentWidth); } } setTimeout(setupMutationObserver, 1000); if (fetchIntervalId) clearInterval(fetchIntervalId); fetchIntervalId = setInterval(fetchData, CONFIG.refreshInterval); log.info(`Refresh interval set: ${CONFIG.refreshInterval / 1000}s.`); if (notificationIntervalId) clearInterval(notificationIntervalId); notificationIntervalId = setInterval(fetchNewListingsForNotifications, CONFIG.refreshInterval); setTimeout(fetchNewListingsForNotifications, 3000); setupDismissedNotificationSync(); log.info('Notification check interval set.'); setTimeout(() => { const b = document.getElementById('ipv4-banner'); if (b) { log.info("Final position check."); enforceLeftEdgeGap(b); ensureBannerInViewport(b); }}, 500); } else { log.error("Initialization failed: createBanner() returned false."); releaseInitLock(); } addCleanupListeners(); } catch (e) { log.error('CRITICAL ERROR during main initialization:', e, e.stack); releaseInitLock(); } }
   function setupMutationObserver() { if(!CONFIG.mutationObserverEnabled||isDestroyed||observer)return;try{observer=new MutationObserver(m=>{if(isDestroyed)return;for(const mu of m){if(mu.type==='childList'){const b=document.getElementById('ipv4-banner');if(bannerCreated&&!b && !isDestroyed ){const n=Date.now();if(recreationCount>=CONFIG.recreationMaxCount){log.warn(`Banner removed ${recreationCount} times, giving up.`);return;}if(n-lastRecreationTime<CONFIG.recreationDelay){setTimeout(()=>{if(!bannerExists()&&!isDestroyed){log.warn(`Banner removed, recreating (attempt ${recreationCount+1}) delayed`);recreationCount++;lastRecreationTime=Date.now();createBanner().then(ok => { if(ok && !isMinimized && bannerExists()) fetchData(); });}},CONFIG.recreationDelay);}else{log.warn(`Banner removed, recreating (attempt ${recreationCount+1})`);recreationCount++;lastRecreationTime=n;createBanner().then(ok => { if(ok && !isMinimized && bannerExists()) fetchData(); });}}return;}}});observer.observe(document.body,{childList:true,subtree:false});log.info("MutationObserver setup.");}catch(e){log.warn('Error setup MutationObserver:',e);}}
   function addCleanupListeners() { try{window.addEventListener('pagehide',function(event){cleanup(false, event);});window.addEventListener('beforeunload',function(event){cleanup(false, event);});log.info("Cleanup listeners added.");}catch(e){log.warn('Error setup cleanup listeners:',e);}}
   function cleanup(fullCleanup = false, event = null) { 
