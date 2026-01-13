@@ -151,7 +151,53 @@ class SimpleChart {
             }
         }
 
-        // For pie and line charts - check stored data points
+        // For line charts, use dynamic position calculation with actual rendered dimensions
+        if (this.chartMetadata && this.chartMetadata.type === 'line') {
+            const meta = this.chartMetadata;
+
+            // Use actual rendered canvas dimensions
+            const actualWidth = rect.width;
+            const actualHeight = rect.height;
+
+            // Recalculate chart dimensions based on actual size
+            const scaleX = actualWidth / this.width;
+            const scaleY = actualHeight / this.height;
+
+            const actualChartLeft = this.padding.left * scaleX;
+            const actualChartTop = this.padding.top * scaleY;
+            const actualChartRight = actualWidth - this.padding.right * scaleX;
+            const actualChartBottom = (this.height - this.padding.bottom) * scaleY;
+            const actualChartWidth = actualChartRight - actualChartLeft;
+            const actualChartHeight = actualChartBottom - actualChartTop;
+
+            const numPoints = meta.data.length;
+            const actualPointSpacing = actualChartWidth / (numPoints - 1 || 1);
+
+            // Find closest point
+            let closestPoint = null;
+            let closestDistance = Infinity;
+
+            for (let i = 0; i < numPoints; i++) {
+                const pointX = actualChartLeft + i * actualPointSpacing;
+                const pointY = actualChartTop + actualChartHeight - ((meta.data[i] - meta.minValue) / meta.valueRange) * actualChartHeight;
+
+                const distance = Math.sqrt(Math.pow(x - pointX, 2) + Math.pow(y - pointY, 2));
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    closestPoint = { index: i, x: pointX, y: pointY };
+                }
+            }
+
+            // Show tooltip if close enough to a point
+            if (closestPoint && closestDistance < 20) {
+                const value = meta.data[closestPoint.index];
+                const label = `${meta.labels[closestPoint.index]}: ${formatPrice(value)}`;
+                this.showTooltip({ label: label }, e.clientX, e.clientY);
+                return;
+            }
+        }
+
+        // For pie charts - check stored data points
         for (const point of this.dataPoints) {
             if (point.x !== undefined && point.y !== undefined && point.radius !== undefined) {
                 const distance = Math.sqrt(Math.pow(x - point.x, 2) + Math.pow(y - point.y, 2));
@@ -391,6 +437,16 @@ class SimpleChart {
         const minValue = Math.min(...data, 0);
         const valueRange = maxValue - minValue || 1;
         const pointSpacing = chartWidth / (data.length - 1 || 1);
+
+        // Store metadata for hover detection
+        this.chartMetadata = {
+            type: 'line',
+            data: data,
+            labels: labels,
+            minValue: minValue,
+            maxValue: maxValue,
+            valueRange: valueRange
+        };
 
         this.animate((progress) => {
             // Draw axes
