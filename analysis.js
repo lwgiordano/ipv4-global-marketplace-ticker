@@ -122,18 +122,13 @@ class SimpleChart {
 
     showTooltip(point, clientX, clientY) {
         this.tooltip.innerHTML = point.label;
-        this.tooltip.style.display = 'block';
         this.tooltip.style.left = (clientX + 10) + 'px';
         this.tooltip.style.top = (clientY - 30) + 'px';
-        // Trigger smooth animation
-        setTimeout(() => this.tooltip.classList.add('show'), 10);
+        this.tooltip.style.display = 'block';
     }
 
     hideTooltip() {
-        this.tooltip.classList.remove('show');
-        setTimeout(() => {
-            this.tooltip.style.display = 'none';
-        }, 200);
+        this.tooltip.style.display = 'none';
     }
 
     animate(drawCallback, duration = 800) {
@@ -206,10 +201,10 @@ class SimpleChart {
                 this.ctx.fillStyle = COLORS.primary;
                 this.ctx.fillRect(x, y, barWidth, barHeight);
 
-                // Add to data points for tooltip - store exact coordinates with small padding
+                // Add to data points for tooltip - store exact coordinates with padding
                 if (progress === 1) {
                     const formattedValue = isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
-                    const padding = 2;
+                    const padding = 8;
                     this.dataPoints.push({
                         left: x - padding,
                         right: x + barWidth + padding,
