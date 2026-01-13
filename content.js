@@ -358,11 +358,22 @@
     }
   }
 
-  // Cross-tab sync: Listen for storage changes and update UI
+  // Cross-tab sync: Listen for storage changes and update UI/settings
   function setupDismissedNotificationSync() {
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
       chrome.storage.onChanged.addListener((changes, areaName) => {
-        if (areaName === 'local' && changes[CONFIG.notifyMeDismissedKey]) {
+        if (areaName !== 'local') return;
+
+        // Update cached settings for any changed keys
+        for (const key of Object.keys(changes)) {
+          if (changes[key].newValue !== undefined) {
+            currentSettings[key] = changes[key].newValue;
+            log.info(`Setting "${key}" updated from another tab`);
+          }
+        }
+
+        // Handle dismissed notifications sync
+        if (changes[CONFIG.notifyMeDismissedKey]) {
           const newDismissed = changes[CONFIG.notifyMeDismissedKey].newValue || {};
           log.info('Dismissed notifications changed from another tab:', newDismissed);
 
@@ -436,8 +447,14 @@
             }, 200);
           }
         }
+
+        // If notification settings changed, trigger an immediate check
+        if (changes[CONFIG.notifyMeEnabledKey] || changes[CONFIG.notifyMeRulesKey]) {
+          log.info('Notification settings changed, triggering check');
+          setTimeout(fetchNewListingsForNotifications, 1000);
+        }
       });
-      log.info('Cross-tab notification sync listener set up');
+      log.info('Cross-tab settings sync listener set up');
     }
   }
 
