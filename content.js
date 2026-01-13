@@ -726,6 +726,8 @@
   }
 
   async function playNotificationSound() {
+    log.info('playNotificationSound called, userHasInteracted:', userHasInteracted);
+
     // MUST check this first - before ANY audio-related code
     if (!userHasInteracted) {
       log.info('Sound skipped - no user interaction yet');
@@ -734,7 +736,8 @@
 
     try {
       const soundEnabled = await getSetting(CONFIG.notifyMeSoundKey, true);
-      if (!soundEnabled) {
+      log.info('Sound setting value:', soundEnabled, 'type:', typeof soundEnabled);
+      if (soundEnabled === false) {
         log.info('Sound skipped - disabled in settings');
         return;
       }
