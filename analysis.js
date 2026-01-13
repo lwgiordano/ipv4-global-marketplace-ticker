@@ -100,11 +100,8 @@ class SimpleChart {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        // Check if mouse is over any data point - check in reverse order
-        // so that overlapping regions prefer the last drawn element
-        for (let i = this.dataPoints.length - 1; i >= 0; i--) {
-            const point = this.dataPoints[i];
-
+        // Check if mouse is over any data point
+        for (const point of this.dataPoints) {
             // For bar charts, use rectangular hit detection
             if (point.left !== undefined && point.right !== undefined) {
                 if (x >= point.left && x <= point.right && y >= point.top && y <= point.bottom) {
@@ -204,10 +201,10 @@ class SimpleChart {
                 this.ctx.fillStyle = COLORS.primary;
                 this.ctx.fillRect(x, y, barWidth, barHeight);
 
-                // Add to data points for tooltip - store exact coordinates with small padding
+                // Add to data points for tooltip - store exact coordinates with padding
                 if (progress === 1) {
                     const formattedValue = isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
-                    const padding = 3;
+                    const padding = 8;
                     this.dataPoints.push({
                         left: x - padding,
                         right: x + barWidth + padding,
