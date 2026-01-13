@@ -100,31 +100,45 @@ class SimpleChart {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        // For bar charts, use slot-based detection
-        if (this.chartMetadata && this.chartMetadata.type === 'bar' && this.chartMetadata.barSpacing) {
+        // For bar charts, use slot-based detection with actual rendered dimensions
+        if (this.chartMetadata && this.chartMetadata.type === 'bar') {
             const meta = this.chartMetadata;
 
+            // Use actual rendered canvas dimensions to calculate positions
+            // This handles CSS scaling (max-width, etc.) automatically
+            const actualWidth = rect.width;
+            const actualHeight = rect.height;
+
+            // Recalculate chart dimensions based on actual size
+            const scaleX = actualWidth / this.width;
+            const scaleY = actualHeight / this.height;
+
+            const actualChartLeft = this.padding.left * scaleX;
+            const actualChartTop = this.padding.top * scaleY;
+            const actualChartBottom = (this.height - this.padding.bottom) * scaleY;
+            const actualChartWidth = actualWidth - (this.padding.left + this.padding.right) * scaleX;
+
             // Check if mouse is in chart area vertically
-            if (y < meta.chartTop || y > meta.chartBottom) {
+            if (y < actualChartTop || y > actualChartBottom) {
                 this.hideTooltip();
                 return;
             }
 
+            // Calculate bar dimensions based on actual rendered size
+            const numBars = meta.data.length;
+            const actualBarSpacing = actualChartWidth / numBars;
+            const actualBarWidth = actualBarSpacing * 0.7;
+
             // Calculate which bar slot the mouse is in
-            const relativeX = x - meta.chartLeft;
-            const slotIndex = Math.floor(relativeX / meta.barSpacing);
+            const relativeX = x - actualChartLeft;
+            const slotIndex = Math.floor(relativeX / actualBarSpacing);
 
             // Check if index is valid
-            if (slotIndex >= 0 && slotIndex < meta.data.length) {
-                // Calculate the bar boundaries within this slot
-                const slotStart = slotIndex * meta.barSpacing;
-                const barStart = slotStart + (meta.barSpacing - meta.barWidth) / 2;
-                const barEnd = barStart + meta.barWidth;
-
+            if (slotIndex >= 0 && slotIndex < numBars) {
                 // Check if mouse is actually over the bar (not in the gap)
-                const posInSlot = relativeX - slotStart;
-                const barStartInSlot = (meta.barSpacing - meta.barWidth) / 2;
-                const barEndInSlot = barStartInSlot + meta.barWidth;
+                const posInSlot = relativeX - (slotIndex * actualBarSpacing);
+                const barStartInSlot = (actualBarSpacing - actualBarWidth) / 2;
+                const barEndInSlot = barStartInSlot + actualBarWidth;
 
                 if (posInSlot >= barStartInSlot && posInSlot <= barEndInSlot) {
                     const value = meta.data[slotIndex];
