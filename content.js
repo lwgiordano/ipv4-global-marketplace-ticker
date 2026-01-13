@@ -711,39 +711,52 @@
 
   // Track user interaction for audio permission
   function setupUserInteractionTracking() {
-    const interactionEvents = ['click', 'keydown', 'touchstart'];
+    const interactionEvents = ['click', 'mousedown', 'keydown', 'touchstart'];
     const handleInteraction = () => {
       if (!userHasInteracted) {
         userHasInteracted = true;
-        interactionEvents.forEach(event => {
-          document.removeEventListener(event, handleInteraction);
-        });
+        log.info('User interaction detected - audio enabled');
       }
     };
+    // Listen on both document and window to catch all interactions
     interactionEvents.forEach(event => {
-      document.addEventListener(event, handleInteraction, { once: false, passive: true });
+      document.addEventListener(event, handleInteraction, { capture: true, passive: true });
+      window.addEventListener(event, handleInteraction, { capture: true, passive: true });
     });
   }
 
   async function playNotificationSound() {
     // MUST check this first - before ANY audio-related code
-    if (!userHasInteracted) return;
+    if (!userHasInteracted) {
+      log.info('Sound skipped - no user interaction yet');
+      return;
+    }
 
     try {
       const soundEnabled = await getSetting(CONFIG.notifyMeSoundKey, true);
-      if (!soundEnabled) return;
+      if (!soundEnabled) {
+        log.info('Sound skipped - disabled in settings');
+        return;
+      }
 
       // Create audio context only after confirmed user interaction
       if (!audioContext) {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        log.info('AudioContext created');
       }
 
       // Resume if suspended
       if (audioContext.state === 'suspended') {
         await audioContext.resume();
+        log.info('AudioContext resumed');
       }
 
-      if (audioContext.state !== 'running') return;
+      if (audioContext.state !== 'running') {
+        log.info('AudioContext not running, state:', audioContext.state);
+        return;
+      }
+
+      log.info('Playing notification sound');
 
       const soundType = await getSetting(CONFIG.notifyMeSoundTypeKey, 'chime');
 
