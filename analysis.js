@@ -102,17 +102,18 @@ class SimpleChart {
 
         // Check if mouse is over any data point
         for (const point of this.dataPoints) {
-            // For bar charts, use simple rectangular hit detection on actual bar area
-            if (point.centerX !== undefined) {
-                // Check if mouse is within the actual bar boundaries
+            // For bar charts - check using left/right/top/bottom properties
+            if (point.left !== undefined && point.right !== undefined && point.top !== undefined && point.bottom !== undefined) {
+                // Check if mouse is within the bar boundaries
                 if (x >= point.left && x <= point.right && y >= point.top && y <= point.bottom) {
                     this.showTooltip(point, e.clientX, e.clientY);
                     return;
                 }
-            } else {
-                // For pie and line charts, use circular hit detection
+            }
+            // For pie and line charts - check using x/y/radius properties
+            else if (point.x !== undefined && point.y !== undefined && point.radius !== undefined) {
                 const distance = Math.sqrt(Math.pow(x - point.x, 2) + Math.pow(y - point.y, 2));
-                if (distance < (point.radius || 10)) {
+                if (distance < point.radius) {
                     this.showTooltip(point, e.clientX, e.clientY);
                     return;
                 }
@@ -202,11 +203,10 @@ class SimpleChart {
                 this.ctx.fillStyle = COLORS.primary;
                 this.ctx.fillRect(x, y, barWidth, barHeight);
 
-                // Add to data points for tooltip - store center position and actual bar dimensions
+                // Add to data points for tooltip - store exact bar boundaries
                 if (progress === 1) {
                     const formattedValue = isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
                     this.dataPoints.push({
-                        centerX: x + barWidth / 2,
                         left: x,
                         right: x + barWidth,
                         top: y,
