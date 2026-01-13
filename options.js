@@ -167,6 +167,15 @@ document.addEventListener('DOMContentLoaded', function() {
         notifyRules = notifyRules.filter(rule => rule.id !== ruleId);
         renderNotifyRules();
         saveSettings();
+
+        // Also clear dismissed notifications history for this rule
+        chrome.storage.local.get(['notifyMeDismissed'], (result) => {
+            const dismissed = result.notifyMeDismissed || {};
+            if (dismissed[ruleId]) {
+                delete dismissed[ruleId];
+                chrome.storage.local.set({ notifyMeDismissed: dismissed });
+            }
+        });
     }
 
     // Update notification rule
