@@ -99,8 +99,9 @@
         }
         .toggle-switch {
             position: relative;
-            width: 50px;
-            height: 26px;
+            width: 36px;
+            height: 20px;
+            flex-shrink: 0;
         }
         .toggle-switch input {
             opacity: 0;
@@ -116,13 +117,13 @@
             bottom: 0;
             background-color: #ccc;
             transition: 0.3s;
-            border-radius: 26px;
+            border-radius: 20px;
         }
         .toggle-slider:before {
             position: absolute;
             content: "";
-            height: 20px;
-            width: 20px;
+            height: 14px;
+            width: 14px;
             left: 3px;
             bottom: 3px;
             background-color: white;
@@ -133,7 +134,7 @@
             background-color: #0062FF;
         }
         .toggle-switch input:checked + .toggle-slider:before {
-            transform: translateX(24px);
+            transform: translateX(16px);
         }
         .notify-options {
             display: flex;
@@ -152,11 +153,14 @@
         .notify-option-row label {
             margin-bottom: 0;
             font-weight: normal;
-            min-width: 120px;
+            min-width: 90px;
+            font-size: 13px;
         }
         .notify-option-row select {
             flex: 1;
-            padding: 6px 10px;
+            padding: 5px 8px;
+            font-size: 13px;
+            max-width: 150px;
         }
         .notify-rules {
             margin-top: 15px;
@@ -192,18 +196,34 @@
         }
         .notify-rule-filters {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 8px;
+        }
+        .notify-rule-filters > div {
+            display: flex;
+            flex-direction: column;
         }
         .notify-rule-filters label {
-            font-size: 12px;
-            margin-bottom: 4px;
+            font-size: 11px;
+            margin-bottom: 3px;
+            color: #555;
         }
         .notify-rule-filters select,
         .notify-rule-filters input {
             width: 100%;
-            padding: 6px;
-            font-size: 13px;
+            padding: 5px;
+            font-size: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .notify-rule-filters input[type="number"] {
+            -moz-appearance: textfield;
+        }
+        .notify-rule-filters input[type="number"]::-webkit-outer-spin-button,
+        .notify-rule-filters input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
         }
         .add-rule-btn {
             background: #0062FF;
