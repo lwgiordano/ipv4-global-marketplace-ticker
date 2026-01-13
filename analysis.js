@@ -100,8 +100,8 @@ class SimpleChart {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        // For bar charts, find the nearest bar center using stored positions
-        if (this.chartMetadata && this.chartMetadata.type === 'bar' && this.chartMetadata.barCenters) {
+        // For bar charts, use slot-based detection
+        if (this.chartMetadata && this.chartMetadata.type === 'bar' && this.chartMetadata.barSpacing) {
             const meta = this.chartMetadata;
 
             // Check if mouse is in chart area vertically
@@ -110,27 +110,30 @@ class SimpleChart {
                 return;
             }
 
-            // Find the nearest bar center from stored positions
-            let closestBar = null;
-            let closestDistance = Infinity;
+            // Calculate which bar slot the mouse is in
+            const relativeX = x - meta.chartLeft;
+            const slotIndex = Math.floor(relativeX / meta.barSpacing);
 
-            for (const bar of meta.barCenters) {
-                const distance = Math.abs(x - bar.centerX);
+            // Check if index is valid
+            if (slotIndex >= 0 && slotIndex < meta.data.length) {
+                // Calculate the bar boundaries within this slot
+                const slotStart = slotIndex * meta.barSpacing;
+                const barStart = slotStart + (meta.barSpacing - meta.barWidth) / 2;
+                const barEnd = barStart + meta.barWidth;
 
-                if (distance < closestDistance) {
-                    closestDistance = distance;
-                    closestBar = bar;
+                // Check if mouse is actually over the bar (not in the gap)
+                const posInSlot = relativeX - slotStart;
+                const barStartInSlot = (meta.barSpacing - meta.barWidth) / 2;
+                const barEndInSlot = barStartInSlot + meta.barWidth;
+
+                if (posInSlot >= barStartInSlot && posInSlot <= barEndInSlot) {
+                    const value = meta.data[slotIndex];
+                    const formattedValue = meta.isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
+                    const label = `${meta.labels[slotIndex]}: ${formattedValue}`;
+
+                    this.showTooltip({ label: label }, e.clientX, e.clientY);
+                    return;
                 }
-            }
-
-            // Show tooltip if we found a bar and we're reasonably close
-            if (closestBar && closestDistance < 50) {
-                const value = meta.data[closestBar.index];
-                const formattedValue = meta.isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
-                const label = `${meta.labels[closestBar.index]}: ${formattedValue}`;
-
-                this.showTooltip({ label: label }, e.clientX, e.clientY);
-                return;
             }
         }
 
@@ -206,6 +209,9 @@ class SimpleChart {
             labels: labels,
             isPriceChart: isPriceChart,
             barCenters: barCenters,
+            barSpacing: barSpacing,
+            barWidth: barWidth,
+            chartLeft: this.padding.left,
             chartTop: this.padding.top,
             chartBottom: this.height - this.padding.bottom
         };
