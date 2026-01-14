@@ -39,7 +39,9 @@
     overflowCheckExtraPadding: 40,
     excludedDomainsStorageKey: 'excludedDomainsText',
     blockSizeFilterStorageKey: 'selectedBlockSize',
+    blockSizesFilterStorageKey: 'selectedBlockSizes',
     rirFilterStorageKey: 'selectedRir',
+    rirsFilterStorageKey: 'selectedRirs',
     animationSpeedSettingKey: 'animationSpeedSetting',
     // Notify Me keys
     notifyMeEnabledKey: 'notifyMeEnabled',
@@ -165,7 +167,7 @@
   function getTodayDate() { const t = new Date(); const y = t.getFullYear(); let m = t.getMonth() + 1; let d = t.getDate(); if (m < 10) m = '0' + m; if (d < 10) d = '0' + d; return `${y}-${m}-${d}`; }
   function getTomorrowDate() { const t = new Date(); const tm = new Date(t); tm.setDate(t.getDate() + 1); const y = tm.getFullYear(); let m = tm.getMonth() + 1; let d = tm.getDate(); if (m < 10) m = '0' + m; if (d < 10) d = '0' + d; return `${y}-${m}-${d}`; }
   function getStartOfCurrentYearDate() { return `${new Date().getFullYear()}-01-01`; }
-  async function getRequestBody() { log.info("Constructing request body for mode:", currentViewMode); let selectedBlockSize = null; let selectedRir = null; if (isChromeAvailable()) { try { const items = await new Promise((resolve, reject) => { chrome.storage.local.get([CONFIG.blockSizeFilterStorageKey, CONFIG.rirFilterStorageKey], result => { if (chrome.runtime.lastError) reject(chrome.runtime.lastError); else resolve(result); }); }); selectedBlockSize = items[CONFIG.blockSizeFilterStorageKey]; selectedRir = items[CONFIG.rirFilterStorageKey]; log.info("Retrieved from storage:", {selectedBlockSize, selectedRir}); } catch (error) { log.warn("Error getting filters from storage:", error.message); } } let blockFilter = [24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8]; if (selectedBlockSize && selectedBlockSize !== "") { const size = parseInt(selectedBlockSize); if (!isNaN(size) && size >= 8 && size <= 24) { blockFilter = [size]; log.info("Applying block size filter:", size); } else { log.warn("Invalid selectedBlockSize, using default block filter:", selectedBlockSize); } } else { log.info("No specific block size selected or 'All Sizes', using default block filter."); } let rirFilter = ["arin", "apnic", "ripe", "afrinic", "lacnic"]; if (selectedRir && selectedRir !== "") { rirFilter = [selectedRir.toLowerCase()]; log.info("Applying RIR filter:", selectedRir); } else { log.info("No specific RIR selected or 'All RIRs', using default RIR filter."); } if (currentViewMode === VIEW_MODES.PRIOR_SALES) { return { filter: { block: blockFilter, region: rirFilter, period: { from: getStartOfCurrentYearDate(), to: getTomorrowDate() }}, sort: { property: "date", direction: "desc" }, offset: 0, limit: 25 }; } else { return { filter: { block: blockFilter, region: rirFilter}, sort: { property: "date", direction: "desc" }, offset: 0, limit: 25 }; } }
+  async function getRequestBody() { log.info("Constructing request body for mode:", currentViewMode); let selectedBlockSize = null; let selectedBlockSizes = null; let selectedRir = null; let selectedRirs = null; if (isChromeAvailable()) { try { const items = await new Promise((resolve, reject) => { chrome.storage.local.get([CONFIG.blockSizeFilterStorageKey, CONFIG.blockSizesFilterStorageKey, CONFIG.rirFilterStorageKey, CONFIG.rirsFilterStorageKey], result => { if (chrome.runtime.lastError) reject(chrome.runtime.lastError); else resolve(result); }); }); selectedBlockSize = items[CONFIG.blockSizeFilterStorageKey]; selectedBlockSizes = items[CONFIG.blockSizesFilterStorageKey]; selectedRir = items[CONFIG.rirFilterStorageKey]; selectedRirs = items[CONFIG.rirsFilterStorageKey]; log.info("Retrieved from storage:", {selectedBlockSize, selectedBlockSizes, selectedRir, selectedRirs}); } catch (error) { log.warn("Error getting filters from storage:", error.message); } } let blockFilter = [24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8]; if (selectedBlockSizes && Array.isArray(selectedBlockSizes) && selectedBlockSizes.length > 0) { blockFilter = selectedBlockSizes.map(s => parseInt(s)).filter(n => !isNaN(n) && n >= 8 && n <= 24); if (blockFilter.length > 0) { log.info("Applying block sizes filter:", blockFilter); } else { blockFilter = [24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8]; log.warn("Invalid selectedBlockSizes, using default block filter"); } } else if (selectedBlockSize && selectedBlockSize !== "") { const size = parseInt(selectedBlockSize); if (!isNaN(size) && size >= 8 && size <= 24) { blockFilter = [size]; log.info("Applying block size filter:", size); } else { log.warn("Invalid selectedBlockSize, using default block filter:", selectedBlockSize); } } else { log.info("No specific block size selected or 'All Sizes', using default block filter."); } let rirFilter = ["arin", "apnic", "ripe", "afrinic", "lacnic"]; if (selectedRirs && Array.isArray(selectedRirs) && selectedRirs.length > 0) { rirFilter = selectedRirs.map(r => r.toLowerCase()); log.info("Applying RIRs filter:", rirFilter); } else if (selectedRir && selectedRir !== "") { rirFilter = [selectedRir.toLowerCase()]; log.info("Applying RIR filter:", selectedRir); } else { log.info("No specific RIR selected or 'All RIRs', using default RIR filter."); } if (currentViewMode === VIEW_MODES.PRIOR_SALES) { return { filter: { block: blockFilter, region: rirFilter, period: { from: getStartOfCurrentYearDate(), to: getTomorrowDate() }}, sort: { property: "date", direction: "desc" }, offset: 0, limit: 25 }; } else { return { filter: { block: blockFilter, region: rirFilter}, sort: { property: "date", direction: "desc" }, offset: 0, limit: 25 }; } }
   function getCurrentApiEndpoint() { return currentViewMode === VIEW_MODES.PRIOR_SALES ? CONFIG.priorSalesApi : CONFIG.newListingsApi; }
   function calculateMaxBannerWidth() { return Math.max(CONFIG.minWidth, getViewportWidth() - (2 * CONFIG.edgeGap)); }
   
@@ -459,17 +461,20 @@
   }
 
   function itemMatchesRule(item, rule) {
-    // Check block size
-    if (rule.blockSize && rule.blockSize !== '') {
-      const ruleBlockSize = parseInt(rule.blockSize);
+    // Check block size (supports both array and single value)
+    const blockSizes = rule.blockSizes || (rule.blockSize && rule.blockSize !== '' ? [rule.blockSize] : []);
+    if (blockSizes.length > 0) {
       const itemBlockSize = parseInt(item.block);
-      if (ruleBlockSize !== itemBlockSize) return false;
+      const matchesBlockSize = blockSizes.some(bs => parseInt(bs) === itemBlockSize);
+      if (!matchesBlockSize) return false;
     }
 
-    // Check RIR
-    if (rule.rir && rule.rir !== '') {
+    // Check RIR (supports both array and single value)
+    const rirs = rule.rirs || (rule.rir && rule.rir !== '' ? [rule.rir] : []);
+    if (rirs.length > 0) {
       const itemRir = (item.region || '').toLowerCase();
-      if (rule.rir.toLowerCase() !== itemRir) return false;
+      const matchesRir = rirs.some(r => r.toLowerCase() === itemRir);
+      if (!matchesRir) return false;
     }
 
     // Rules only trigger when both min AND max price are filled out
