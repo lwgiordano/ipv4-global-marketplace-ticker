@@ -1597,15 +1597,21 @@
   function restartAnimationIfNeeded() {
     if (isDestroyed || !bannerCreated || isMinimized) return;
     const scrollContent = document.getElementById('ipv4-scroll-content');
-    if (scrollContent) {
-      // Force animation restart by removing and re-adding the animation
-      const currentAnimation = scrollContent.style.animation;
-      scrollContent.style.animation = 'none';
-      void scrollContent.offsetWidth; // Trigger reflow
-      scrollContent.style.animation = currentAnimation || '';
-      // Also ensure play state is running
-      scrollContent.style.animationPlayState = 'running';
-      log.info('Animation restarted');
+    if (scrollContent && animationStyleElement) {
+      // Get the current animation from computed style (set by our stylesheet)
+      const computedStyle = window.getComputedStyle(scrollContent);
+      const animationName = computedStyle.animationName;
+      const animationDuration = computedStyle.animationDuration;
+
+      if (animationName && animationName !== 'none') {
+        // Force restart by briefly removing the element from animation
+        scrollContent.style.animation = 'none';
+        void scrollContent.offsetWidth; // Force reflow
+        // Re-apply using the computed values
+        scrollContent.style.animation = `${animationName} ${animationDuration} linear infinite`;
+        scrollContent.style.animationPlayState = 'running';
+        log.info('Animation restarted:', animationName);
+      }
     }
   }
   function setupVisibilityChangeListener() {
@@ -1614,29 +1620,35 @@
       document.addEventListener('visibilitychange', function() {
         if (document.visibilityState === 'visible') {
           log.info('Page became visible, restarting animation');
-          restartAnimationIfNeeded();
+          setTimeout(restartAnimationIfNeeded, 100);
         }
       });
       // Handle window focus (catches download dialogs, print dialogs, etc.)
       window.addEventListener('focus', function() {
         log.info('Window gained focus, restarting animation');
-        setTimeout(restartAnimationIfNeeded, 100); // Small delay for browser to settle
+        setTimeout(restartAnimationIfNeeded, 100);
       });
-      // Periodic animation health check every 30 seconds
+      // Restart animation when user interacts with the ticker area
+      const scrollContainer = document.getElementById('ipv4-scroll-container');
+      if (scrollContainer) {
+        scrollContainer.addEventListener('mouseenter', function() {
+          restartAnimationIfNeeded();
+        });
+      }
+      // Faster periodic animation health check (every 5 seconds)
       setInterval(function() {
         if (isDestroyed || !bannerCreated || isMinimized) return;
         const scrollContent = document.getElementById('ipv4-scroll-content');
         if (scrollContent) {
           const computedStyle = window.getComputedStyle(scrollContent);
-          const animationName = computedStyle.animationName;
           const animationPlayState = computedStyle.animationPlayState;
-          // If animation is not running or has no animation, restart it
-          if (!animationName || animationName === 'none' || animationPlayState === 'paused') {
-            log.info('Animation health check: animation stopped, restarting');
+          // Check if animation is paused unexpectedly
+          if (animationPlayState === 'paused') {
+            log.info('Animation health check: animation paused, restarting');
             restartAnimationIfNeeded();
           }
         }
-      }, 30000);
+      }, 5000);
       log.info('Visibility and focus listeners added.');
     } catch (e) {
       log.warn('Error setting up visibility change listener:', e);
