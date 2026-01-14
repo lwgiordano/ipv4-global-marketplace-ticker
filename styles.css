@@ -119,7 +119,6 @@
   will-change: transform !important;
   backface-visibility: hidden !important;
   -webkit-backface-visibility: hidden !important;
-  transform: translateZ(0) !important;
 }
 
 /* Styling for sale item parts (ticker text) */

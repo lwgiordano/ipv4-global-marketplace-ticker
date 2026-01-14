@@ -1488,8 +1488,8 @@
         animationStyleElement = document.createElement('style');
         animationStyleElement.textContent = `
             @keyframes ${an} {
-                0% { transform: translateX(0); }
-                100% { transform: translateX(-${width}px); }
+                0% { transform: translate3d(0, 0, 0); }
+                100% { transform: translate3d(-${width}px, 0, 0); }
             }
             #ipv4-scroll-content {
                 animation: ${an} ${dur}s linear infinite;
