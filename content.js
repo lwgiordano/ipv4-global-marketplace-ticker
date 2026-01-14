@@ -1629,6 +1629,8 @@
       }
     }
   }
+  let lastTransformValue = null;
+  let stuckCheckCount = 0;
   function setupVisibilityChangeListener() {
     try {
       // Handle tab visibility changes
@@ -1643,25 +1645,26 @@
         log.info('Window gained focus, restarting animation');
         setTimeout(restartAnimationIfNeeded, 100);
       });
-      // Restart animation when user interacts with the ticker area
-      const scrollContainer = document.getElementById('ipv4-scroll-container');
-      if (scrollContainer) {
-        scrollContainer.addEventListener('mouseenter', function() {
-          restartAnimationIfNeeded();
-        });
-      }
-      // Faster periodic animation health check (every 5 seconds)
+      // Health check: detect stuck animation by comparing transform values
       setInterval(function() {
         if (isDestroyed || !bannerCreated || isMinimized) return;
         const scrollContent = document.getElementById('ipv4-scroll-content');
         if (scrollContent) {
           const computedStyle = window.getComputedStyle(scrollContent);
-          const animationPlayState = computedStyle.animationPlayState;
-          // Check if animation is paused unexpectedly
-          if (animationPlayState === 'paused') {
-            log.info('Animation health check: animation paused, restarting');
-            restartAnimationIfNeeded();
+          const currentTransform = computedStyle.transform;
+          // If transform hasn't changed since last check, animation might be stuck
+          if (lastTransformValue !== null && currentTransform === lastTransformValue) {
+            stuckCheckCount++;
+            // Only restart if stuck for 2 consecutive checks (10 seconds)
+            if (stuckCheckCount >= 2) {
+              log.info('Animation health check: transform stuck, restarting');
+              restartAnimationIfNeeded();
+              stuckCheckCount = 0;
+            }
+          } else {
+            stuckCheckCount = 0;
           }
+          lastTransformValue = currentTransform;
         }
       }, 5000);
       log.info('Visibility and focus listeners added.');
