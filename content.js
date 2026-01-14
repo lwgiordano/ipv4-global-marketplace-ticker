@@ -104,7 +104,7 @@
 
 
   const VIEW_MODES = { PRIOR_SALES: 'priorSales', NEW_LISTINGS: 'newListings' };
-  let bannerCreated = false; let animationStyleElement = null; let fetchIntervalId = null; let isDestroyed = false; let retryCount = 0; let recreationCount = 0; let lastRecreationTime = 0; let observer = null; let isMinimized = false; let isDragExpanding = false; let hasFetchedData = false; let isDuringToggleTransition = false; let preMinimizeWidth = null; let preMinimizeWidthPercent = null; let isAtMaxWidth = false; let initialViewportWidth = 0; let lastPositioningTime = 0; let currentViewMode = VIEW_MODES.PRIOR_SALES;
+  let bannerCreated = false; let animationStyleElement = null; let lastAnimationName = null; let lastAnimationDuration = null; let fetchIntervalId = null; let isDestroyed = false; let retryCount = 0; let recreationCount = 0; let lastRecreationTime = 0; let observer = null; let isMinimized = false; let isDragExpanding = false; let hasFetchedData = false; let isDuringToggleTransition = false; let preMinimizeWidth = null; let preMinimizeWidthPercent = null; let isAtMaxWidth = false; let initialViewportWidth = 0; let lastPositioningTime = 0; let currentViewMode = VIEW_MODES.PRIOR_SALES;
   let dragState = { isDragging: false, startY: 0, startX: 0, startTop: 0, startLeft: 0, startRight: 0, isHorizontalDrag: false, isVerticalDrag: false, startWidth: 0, isUsingTop: true, isUsingLeft: false, lastDragTime: 0, resizingDirection: null, initialClickX: 0, dragDistance: 0, lastWidth: 0, dragStartViewportX: 0, wasNearLeftEdge: false, draggedRightward: false, alwaysUseRight: true, ignoreLeftPositioning: false, expandMinX: 0, initialExpandWidth: CONFIG.initialDragExpandWidth, };
   let resizeTimeout = null; let settingsLoaded = false; let currentSettings = {};
   let isFetchingData = false;
@@ -1485,6 +1485,10 @@
 
         log.info(`SetupScrollAnimation: unitWidth=${width}, baseSpeedFactor=${CONFIG.animationBaseSpeedFactor}, speedMultiplier=${currentSpeedMultiplier}, effectiveSpd=${spd}, duration=${dur}s`);
 
+        // Cache animation values for restart function
+        lastAnimationName = an;
+        lastAnimationDuration = `${dur}s`;
+
         animationStyleElement = document.createElement('style');
         animationStyleElement.textContent = `
             @keyframes ${an} {
@@ -1597,17 +1601,28 @@
   function restartAnimationIfNeeded() {
     if (isDestroyed || !bannerCreated || isMinimized) return;
     const scrollContent = document.getElementById('ipv4-scroll-content');
-    if (scrollContent && animationStyleElement) {
-      // Get the current animation from computed style (set by our stylesheet)
+    if (!scrollContent) return;
+
+    // If we have cached animation values, use them
+    if (lastAnimationName && lastAnimationDuration) {
+      scrollContent.style.animation = 'none';
+      void scrollContent.offsetWidth; // Force reflow
+      scrollContent.style.animation = `${lastAnimationName} ${lastAnimationDuration} linear infinite`;
+      scrollContent.style.animationPlayState = 'running';
+      log.info('Animation restarted with cached values:', lastAnimationName);
+      return;
+    }
+
+    // Otherwise try to get from computed style (only works if not already broken)
+    if (animationStyleElement) {
       const computedStyle = window.getComputedStyle(scrollContent);
       const animationName = computedStyle.animationName;
       const animationDuration = computedStyle.animationDuration;
-
       if (animationName && animationName !== 'none') {
-        // Force restart by briefly removing the element from animation
+        lastAnimationName = animationName;
+        lastAnimationDuration = animationDuration;
         scrollContent.style.animation = 'none';
-        void scrollContent.offsetWidth; // Force reflow
-        // Re-apply using the computed values
+        void scrollContent.offsetWidth;
         scrollContent.style.animation = `${animationName} ${animationDuration} linear infinite`;
         scrollContent.style.animationPlayState = 'running';
         log.info('Animation restarted:', animationName);
