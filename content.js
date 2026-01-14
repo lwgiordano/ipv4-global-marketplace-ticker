@@ -1601,33 +1601,25 @@
   function restartAnimationIfNeeded() {
     if (isDestroyed || !bannerCreated || isMinimized) return;
     const scrollContent = document.getElementById('ipv4-scroll-content');
-    if (!scrollContent) return;
+    if (!scrollContent || !scrollContent.innerHTML) return;
 
-    // If we have cached animation values, use them
-    if (lastAnimationName && lastAnimationDuration) {
-      scrollContent.style.animation = 'none';
-      void scrollContent.offsetWidth; // Force reflow
-      scrollContent.style.animation = `${lastAnimationName} ${lastAnimationDuration} linear infinite`;
-      scrollContent.style.animationPlayState = 'running';
-      log.info('Animation restarted with cached values:', lastAnimationName);
-      return;
-    }
+    // Calculate content width same way as renderItems does
+    const tempEl = document.createElement('div');
+    tempEl.style.cssText = 'visibility:hidden;position:absolute;white-space:nowrap;font-size:12px;font-family:Arial,sans-serif;';
+    const uniqueTickerText = scrollContent.innerHTML.split('&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(10))[0] + '&nbsp;&nbsp;&nbsp;&nbsp;';
+    tempEl.innerHTML = uniqueTickerText;
+    document.body.appendChild(tempEl);
+    let contentWidth = tempEl.scrollWidth;
+    document.body.removeChild(tempEl);
+    if (contentWidth < 100) contentWidth = 1000;
 
-    // Otherwise try to get from computed style (only works if not already broken)
-    if (animationStyleElement) {
-      const computedStyle = window.getComputedStyle(scrollContent);
-      const animationName = computedStyle.animationName;
-      const animationDuration = computedStyle.animationDuration;
-      if (animationName && animationName !== 'none') {
-        lastAnimationName = animationName;
-        lastAnimationDuration = animationDuration;
-        scrollContent.style.animation = 'none';
-        void scrollContent.offsetWidth;
-        scrollContent.style.animation = `${animationName} ${animationDuration} linear infinite`;
-        scrollContent.style.animationPlayState = 'running';
-        log.info('Animation restarted:', animationName);
-      }
-    }
+    // Clear any inline animation styles
+    scrollContent.style.animation = '';
+    scrollContent.style.animationPlayState = '';
+
+    // Call setupScrollAnimation to recreate the animation from scratch
+    log.info('Restarting animation via setupScrollAnimation, width:', contentWidth);
+    setupScrollAnimation(scrollContent, contentWidth);
   }
   let lastTransformValue = null;
   let stuckCheckCount = 0;
