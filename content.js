@@ -1637,36 +1637,47 @@
       document.addEventListener('visibilitychange', function() {
         if (document.visibilityState === 'visible') {
           log.info('Page became visible, restarting animation');
+          lastTransformValue = null; // Clear so we don't false-detect as stuck
           setTimeout(restartAnimationIfNeeded, 100);
         }
       });
       // Handle window focus (catches download dialogs, print dialogs, etc.)
       window.addEventListener('focus', function() {
         log.info('Window gained focus, restarting animation');
+        lastTransformValue = null;
         setTimeout(restartAnimationIfNeeded, 100);
       });
       // Health check: detect stuck animation by comparing transform values
       setInterval(function() {
         if (isDestroyed || !bannerCreated || isMinimized) return;
         const scrollContent = document.getElementById('ipv4-scroll-content');
-        if (scrollContent) {
-          const computedStyle = window.getComputedStyle(scrollContent);
-          const currentTransform = computedStyle.transform;
-          // If transform hasn't changed since last check, animation might be stuck
-          if (lastTransformValue !== null && currentTransform === lastTransformValue) {
-            stuckCheckCount++;
-            // Only restart if stuck for 2 consecutive checks (10 seconds)
-            if (stuckCheckCount >= 2) {
-              log.info('Animation health check: transform stuck, restarting');
-              restartAnimationIfNeeded();
-              stuckCheckCount = 0;
-            }
-          } else {
-            stuckCheckCount = 0;
-          }
-          lastTransformValue = currentTransform;
+        if (!scrollContent) return;
+
+        // Skip check if user is hovering (animation is intentionally paused)
+        if (scrollContent.matches(':hover')) {
+          lastTransformValue = null;
+          return;
         }
-      }, 5000);
+
+        const computedStyle = window.getComputedStyle(scrollContent);
+        const currentTransform = computedStyle.transform;
+
+        // If transform hasn't changed since last check, animation is stuck
+        if (lastTransformValue !== null && currentTransform === lastTransformValue) {
+          stuckCheckCount++;
+          log.info(`Animation stuck check: ${stuckCheckCount}/2, transform=${currentTransform}`);
+          if (stuckCheckCount >= 2) {
+            log.info('Animation stuck, restarting');
+            restartAnimationIfNeeded();
+            stuckCheckCount = 0;
+            lastTransformValue = null; // Clear after restart
+            return;
+          }
+        } else {
+          stuckCheckCount = 0;
+        }
+        lastTransformValue = currentTransform;
+      }, 3000); // Check every 3 seconds for faster recovery
       log.info('Visibility and focus listeners added.');
     } catch (e) {
       log.warn('Error setting up visibility change listener:', e);
