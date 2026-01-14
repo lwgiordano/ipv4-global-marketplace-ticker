@@ -1594,21 +1594,50 @@
   async function initialize() { log.info('Initializing banner script...'); const lockAcquired = await acquireInitLock(); if (!lockAcquired) { log.warn('Could not acquire init lock. Aborted.'); return; } log.info("Init lock acquired."); const oldBanner = document.getElementById('ipv4-banner'); if (oldBanner) { log.warn('Old banner found. Removing.'); try { oldBanner.parentNode.removeChild(oldBanner); bannerCreated = false; } catch(e) { log.error("Error removing old banner:", e); }} try { initialViewportWidth = getViewportWidth(); log.info("Getting settings..."); await getAllSettings(); currentViewMode = await getSavedViewMode(); isMinimized = await getSavedMinimizedState(); log.info("Pre-creation states:", { currentViewMode, isMinimized }); log.info("Creating banner..."); const created = await createBanner(); if (created) { log.info("Banner created successfully in initialize."); if (!isMinimized && hasFetchedData) { const scrollContent = document.getElementById('ipv4-scroll-content'); if (scrollContent && scrollContent.innerHTML !== '') { let contentWidth = 1000; const tempEl = document.createElement('div'); tempEl.style.cssText = 'visibility:hidden;position:absolute;white-space:nowrap;font-size:12px;font-family:Arial,sans-serif;'; const uniqueTickerText = scrollContent.innerHTML.split('&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(10))[0] + '&nbsp;&nbsp;&nbsp;&nbsp;'; tempEl.innerHTML = uniqueTickerText; document.body.appendChild(tempEl); contentWidth = tempEl.scrollWidth; document.body.removeChild(tempEl); if (contentWidth < 100) contentWidth = 1000; log.info("Re-applying animation with updated speed post-initialize."); setupScrollAnimation(scrollContent, contentWidth); } } setTimeout(setupMutationObserver, 1000); if (fetchIntervalId) clearInterval(fetchIntervalId); fetchIntervalId = setInterval(fetchData, CONFIG.refreshInterval); log.info(`Refresh interval set: ${CONFIG.refreshInterval / 1000}s.`); if (notificationIntervalId) clearInterval(notificationIntervalId); notificationIntervalId = setInterval(fetchNewListingsForNotifications, CONFIG.refreshInterval); setTimeout(fetchNewListingsForNotifications, 3000); setupDismissedNotificationSync(); setupUserInteractionTracking(); log.info('Notification check interval set.'); setTimeout(() => { const b = document.getElementById('ipv4-banner'); if (b) { log.info("Final position check."); enforceLeftEdgeGap(b); ensureBannerInViewport(b); }}, 500); } else { log.error("Initialization failed: createBanner() returned false."); releaseInitLock(); } addCleanupListeners(); setupVisibilityChangeListener(); } catch (e) { log.error('CRITICAL ERROR during main initialization:', e, e.stack); releaseInitLock(); } }
   function setupMutationObserver() { if(!CONFIG.mutationObserverEnabled||isDestroyed||observer)return;try{observer=new MutationObserver(m=>{if(isDestroyed)return;for(const mu of m){if(mu.type==='childList'){const b=document.getElementById('ipv4-banner');if(bannerCreated&&!b && !isDestroyed ){const n=Date.now();if(recreationCount>=CONFIG.recreationMaxCount){log.warn(`Banner removed ${recreationCount} times, giving up.`);return;}if(n-lastRecreationTime<CONFIG.recreationDelay){setTimeout(()=>{if(!bannerExists()&&!isDestroyed){log.warn(`Banner removed, recreating (attempt ${recreationCount+1}) delayed`);recreationCount++;lastRecreationTime=Date.now();createBanner().then(ok => { if(ok && !isMinimized && bannerExists()) fetchData(); });}},CONFIG.recreationDelay);}else{log.warn(`Banner removed, recreating (attempt ${recreationCount+1})`);recreationCount++;lastRecreationTime=n;createBanner().then(ok => { if(ok && !isMinimized && bannerExists()) fetchData(); });}}return;}}});observer.observe(document.body,{childList:true,subtree:false});log.info("MutationObserver setup.");}catch(e){log.warn('Error setup MutationObserver:',e);}}
   function addCleanupListeners() { try{window.addEventListener('pagehide',function(event){cleanup(false, event);});window.addEventListener('beforeunload',function(event){cleanup(false, event);});log.info("Cleanup listeners added.");}catch(e){log.warn('Error setup cleanup listeners:',e);}}
+  function restartAnimationIfNeeded() {
+    if (isDestroyed || !bannerCreated || isMinimized) return;
+    const scrollContent = document.getElementById('ipv4-scroll-content');
+    if (scrollContent) {
+      // Force animation restart by removing and re-adding the animation
+      const currentAnimation = scrollContent.style.animation;
+      scrollContent.style.animation = 'none';
+      void scrollContent.offsetWidth; // Trigger reflow
+      scrollContent.style.animation = currentAnimation || '';
+      // Also ensure play state is running
+      scrollContent.style.animationPlayState = 'running';
+      log.info('Animation restarted');
+    }
+  }
   function setupVisibilityChangeListener() {
     try {
+      // Handle tab visibility changes
       document.addEventListener('visibilitychange', function() {
-        if (document.visibilityState === 'visible' && !isDestroyed && bannerCreated && !isMinimized) {
-          log.info('Page became visible, ensuring animation is running');
-          const scrollContent = document.getElementById('ipv4-scroll-content');
-          if (scrollContent) {
-            // Force animation restart by toggling the animation
-            scrollContent.style.animationPlayState = 'paused';
-            void scrollContent.offsetWidth; // Trigger reflow
-            scrollContent.style.animationPlayState = 'running';
-          }
+        if (document.visibilityState === 'visible') {
+          log.info('Page became visible, restarting animation');
+          restartAnimationIfNeeded();
         }
       });
-      log.info('Visibility change listener added.');
+      // Handle window focus (catches download dialogs, print dialogs, etc.)
+      window.addEventListener('focus', function() {
+        log.info('Window gained focus, restarting animation');
+        setTimeout(restartAnimationIfNeeded, 100); // Small delay for browser to settle
+      });
+      // Periodic animation health check every 30 seconds
+      setInterval(function() {
+        if (isDestroyed || !bannerCreated || isMinimized) return;
+        const scrollContent = document.getElementById('ipv4-scroll-content');
+        if (scrollContent) {
+          const computedStyle = window.getComputedStyle(scrollContent);
+          const animationName = computedStyle.animationName;
+          const animationPlayState = computedStyle.animationPlayState;
+          // If animation is not running or has no animation, restart it
+          if (!animationName || animationName === 'none' || animationPlayState === 'paused') {
+            log.info('Animation health check: animation stopped, restarting');
+            restartAnimationIfNeeded();
+          }
+        }
+      }, 30000);
+      log.info('Visibility and focus listeners added.');
     } catch (e) {
       log.warn('Error setting up visibility change listener:', e);
     }
