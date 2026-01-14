@@ -33,7 +33,7 @@ class SimpleChart {
 
         this.setupCanvas();
 
-        this.padding = { top: 40, right: 30, bottom: 60, left: 70 };
+        this.padding = { top: 40, right: 30, bottom: 60, left: 85 };
         this.tooltip = document.getElementById('chartTooltip');
         this.dataPoints = [];
         this.animationProgress = 0;
@@ -306,7 +306,9 @@ class SimpleChart {
                 this.ctx.stroke();
                 // Format as price or count based on chart type
                 const formattedValue = isPriceChart ? formatPrice(value) : Math.round(value).toLocaleString();
-                this.ctx.fillText(formattedValue, this.padding.left - 60, y + 4);
+                this.ctx.textAlign = 'right';
+                this.ctx.fillText(formattedValue, this.padding.left - 8, y + 4);
+                this.ctx.textAlign = 'left';
             }
 
             // Draw bars with animation
@@ -476,7 +478,9 @@ class SimpleChart {
                 this.ctx.moveTo(this.padding.left, y);
                 this.ctx.lineTo(this.width - this.padding.right, y);
                 this.ctx.stroke();
-                this.ctx.fillText(formatPrice(value), this.padding.left - 60, y + 4);
+                this.ctx.textAlign = 'right';
+                this.ctx.fillText(formatPrice(value), this.padding.left - 8, y + 4);
+                this.ctx.textAlign = 'left';
             }
 
             // Calculate how many points to draw based on animation progress
@@ -558,7 +562,7 @@ class SimpleChart {
             labels.forEach((label, index) => {
                 if (index % labelStep === 0 || index === labels.length - 1) {
                     const x = this.padding.left + index * pointSpacing;
-                    const y = this.height - this.padding.bottom + 15;
+                    const y = this.height - this.padding.bottom + 20;
                     this.ctx.save();
                     this.ctx.translate(x, y);
                     this.ctx.rotate(-Math.PI / 4);

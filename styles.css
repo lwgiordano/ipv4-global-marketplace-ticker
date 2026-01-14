@@ -295,3 +295,212 @@
     display: none !important;
   }
 }
+
+/* Notification Banner Styles */
+#ipv4-notify-banner {
+  position: fixed !important;
+  z-index: 2147483630 !important;
+  background-color: #0062ff !important;
+  color: white !important;
+  padding: 10px 12px !important;
+  border-radius: 4px !important;
+  box-shadow: 0 2px 8px rgba(0, 98, 255, 0.3) !important;
+  font-family: Arial, sans-serif !important;
+  font-size: 12px !important;
+  width: 280px !important;
+  display: none;
+  animation: ipv4-notify-slide-down 0.3s ease-out !important;
+}
+
+@keyframes ipv4-notify-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+#ipv4-notify-banner.ipv4-notify-visible {
+  display: block !important;
+}
+
+#ipv4-notify-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-bottom: 8px !important;
+  padding-bottom: 6px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+#ipv4-notify-title {
+  font-weight: bold !important;
+  font-size: 13px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+}
+
+#ipv4-notify-title::before {
+  content: '' !important;
+}
+
+#ipv4-notify-clear-all {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border: none !important;
+  color: white !important;
+  font-size: 11px !important;
+  font-weight: bold !important;
+  padding: 4px 10px !important;
+  border-radius: 3px !important;
+  cursor: pointer !important;
+  transition: background 0.2s !important;
+}
+
+#ipv4-notify-clear-all:hover {
+  background: rgba(255, 255, 255, 0.35) !important;
+}
+
+#ipv4-notify-content {
+  margin-bottom: 0 !important;
+  line-height: 1.3 !important;
+}
+
+#ipv4-notify-items {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  max-height: none !important;
+  overflow-y: visible !important;
+}
+
+.ipv4-notify-item {
+  background: rgba(255, 255, 255, 0.15) !important;
+  padding: 8px 10px !important;
+  border-radius: 4px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+}
+
+.ipv4-notify-item-info {
+  display: flex !important;
+  gap: 8px !important;
+  font-weight: bold !important;
+  font-size: 12px !important;
+  flex: 1 !important;
+}
+
+.ipv4-notify-item-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-shrink: 0 !important;
+}
+
+.ipv4-notify-item-link {
+  color: #0062ff !important;
+  background: white !important;
+  text-decoration: none !important;
+  font-size: 11px !important;
+  font-weight: bold !important;
+  cursor: pointer !important;
+  padding: 4px 10px !important;
+  border-radius: 3px !important;
+  transition: background 0.2s, color 0.2s !important;
+}
+
+.ipv4-notify-item-link:hover {
+  background: #e6f0ff !important;
+  color: #0051d4 !important;
+}
+
+.ipv4-notify-item-close {
+  background: rgba(255, 255, 255, 0.3) !important;
+  border: none !important;
+  color: white !important;
+  width: 18px !important;
+  height: 18px !important;
+  border-radius: 50% !important;
+  cursor: pointer !important;
+  font-size: 12px !important;
+  line-height: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background 0.2s !important;
+  padding: 0 !important;
+}
+
+.ipv4-notify-item-close:hover {
+  background: rgba(255, 255, 255, 0.5) !important;
+}
+
+#ipv4-notify-count {
+  font-size: 11px !important;
+  opacity: 0.9 !important;
+  margin-top: 8px !important;
+  text-align: center !important;
+}
+
+/* Collapse animations based on banner position */
+.ipv4-notify-collapse-up {
+  animation: ipv4-collapse-up 0.2s ease-out forwards !important;
+}
+
+.ipv4-notify-collapse-down {
+  animation: ipv4-collapse-down 0.2s ease-out forwards !important;
+}
+
+@keyframes ipv4-collapse-up {
+  from {
+    opacity: 1;
+    max-height: 50px;
+    margin-bottom: 6px;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    max-height: 0;
+    margin-bottom: 0;
+    padding: 0;
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes ipv4-collapse-down {
+  from {
+    opacity: 1;
+    max-height: 50px;
+    margin-top: 0;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    max-height: 0;
+    margin-top: 0;
+    padding: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* Slide-in animation for new items */
+.ipv4-notify-slide-in {
+  animation: ipv4-slide-in 0.2s ease-out forwards !important;
+}
+
+@keyframes ipv4-slide-in {
+  from {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    max-height: 50px;
+    transform: translateY(0);
+  }
+}

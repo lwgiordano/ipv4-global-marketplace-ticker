@@ -40,7 +40,13 @@
     excludedDomainsStorageKey: 'excludedDomainsText',
     blockSizeFilterStorageKey: 'selectedBlockSize',
     rirFilterStorageKey: 'selectedRir',
-    animationSpeedSettingKey: 'animationSpeedSetting'
+    animationSpeedSettingKey: 'animationSpeedSetting',
+    // Notify Me keys
+    notifyMeEnabledKey: 'notifyMeEnabled',
+    notifyMeSoundKey: 'notifyMeSound',
+    notifyMeSoundTypeKey: 'notifyMeSoundType',
+    notifyMeRulesKey: 'notifyMeRules',
+    notifyMeDismissedKey: 'notifyMeDismissed'
   };
   const log = {
     info: function(msg, ...args) { if (CONFIG.debug) console.log('[IPv4 Banner]', msg, ...args); },
@@ -100,7 +106,14 @@
   let dragState = { isDragging: false, startY: 0, startX: 0, startTop: 0, startLeft: 0, startRight: 0, isHorizontalDrag: false, isVerticalDrag: false, startWidth: 0, isUsingTop: true, isUsingLeft: false, lastDragTime: 0, resizingDirection: null, initialClickX: 0, dragDistance: 0, lastWidth: 0, dragStartViewportX: 0, wasNearLeftEdge: false, draggedRightward: false, alwaysUseRight: true, ignoreLeftPositioning: false, expandMinX: 0, initialExpandWidth: CONFIG.initialDragExpandWidth, };
   let resizeTimeout = null; let settingsLoaded = false; let currentSettings = {};
   let isFetchingData = false;
-  let isGearSubmenuOpen = false; 
+  let isGearSubmenuOpen = false;
+  let notifyBannerVisible = false;
+  let notifyBannerAboveTicker = true; // Track if banner is positioned above or below ticker
+  let allPendingNotifications = []; // All matching items for the notification banner
+  let dismissedNotifications = {}; // Maps rule IDs to sets of dismissed auction IDs
+  let notificationIntervalId = null;
+  let audioContext = null; // Persistent audio context for notification sounds
+  let userHasInteracted = false; // Track if user has interacted with the page
 
   const fallbackData = { [VIEW_MODES.PRIOR_SALES]: [ { block: 19, region: "arin", pricePerAddress: "$29" }, { block: 24, region: "arin", pricePerAddress: "$32.5" },{ block: 19, region: "ripe", pricePerAddress: "$30" }, { block: 22, region: "ripe", pricePerAddress: "$31.9" },{ block: 22, region: "lacnic", pricePerAddress: "$34.5" }, { block: 22, region: "arin", pricePerAddress: "$34" },{ block: 24, region: "arin", pricePerAddress: "$36" } ], [VIEW_MODES.NEW_LISTINGS]: [ { block: 24, region: "arin", askingPrice: "$35" }, { block: 22, region: "ripe", askingPrice: "$31.5" }, { block: 23, region: "apnic", askingPrice: "$32" }, { block: 21, region: "arin", askingPrice: "$30" }, { block: 24, region: "lacnic", askingPrice: "$33.5" }, { block: 23, region: "arin", askingPrice: "$31" }, { block: 22, region: "arin", askingPrice: "$29.5" } ] };
 
@@ -303,6 +316,649 @@
     return ''; // Return empty if price field or nested price field is not found
   }
 
+  // --- NOTIFICATION FUNCTIONS ---
+  function parsePrice(priceStr) {
+    if (!priceStr || typeof priceStr !== 'string') return null;
+    const cleaned = priceStr.replace(/[^0-9.]/g, '');
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? null : num;
+  }
+
+  async function loadDismissedNotifications() {
+    try {
+      const data = await getSetting(CONFIG.notifyMeDismissedKey, {});
+      dismissedNotifications = data || {};
+      log.info('Loaded dismissed notifications:', dismissedNotifications);
+    } catch (e) {
+      log.warn('Error loading dismissed notifications:', e);
+      dismissedNotifications = {};
+    }
+  }
+
+  async function saveDismissedNotifications() {
+    try {
+      await saveSetting(CONFIG.notifyMeDismissedKey, dismissedNotifications);
+    } catch (e) {
+      log.warn('Error saving dismissed notifications:', e);
+    }
+  }
+
+  function isNotificationDismissed(ruleId, auctionId) {
+    if (!dismissedNotifications[ruleId]) return false;
+    return dismissedNotifications[ruleId].includes(auctionId);
+  }
+
+  function dismissNotification(ruleId, auctionId) {
+    if (!dismissedNotifications[ruleId]) {
+      dismissedNotifications[ruleId] = [];
+    }
+    if (!dismissedNotifications[ruleId].includes(auctionId)) {
+      dismissedNotifications[ruleId].push(auctionId);
+      saveDismissedNotifications();
+    }
+  }
+
+  // Cross-tab sync: Listen for storage changes and update UI/settings
+  function setupDismissedNotificationSync() {
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+      chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName !== 'local') return;
+
+        // Update cached settings for any changed keys
+        for (const key of Object.keys(changes)) {
+          if (changes[key].newValue !== undefined) {
+            currentSettings[key] = changes[key].newValue;
+            log.info(`Setting "${key}" updated from another tab`);
+          }
+        }
+
+        // Handle dismissed notifications sync
+        if (changes[CONFIG.notifyMeDismissedKey]) {
+          const newDismissed = changes[CONFIG.notifyMeDismissedKey].newValue || {};
+          log.info('Dismissed notifications changed from another tab:', newDismissed);
+
+          // Update local state
+          dismissedNotifications = newDismissed;
+
+          // Update pending notifications list - remove any that are now dismissed
+          allPendingNotifications = allPendingNotifications.filter(
+            n => !isNotificationDismissed(n.ruleId, n.auctionId)
+          );
+
+          // Remove any currently displayed items that are now dismissed
+          const banner = document.getElementById('ipv4-notify-banner');
+          if (banner && notifyBannerVisible) {
+            const itemsContainer = banner.querySelector('#ipv4-notify-items');
+            const closeButtons = banner.querySelectorAll('.ipv4-notify-item-close');
+            const itemsToRemove = [];
+
+            closeButtons.forEach(btn => {
+              const rid = btn.dataset.ruleId;
+              const aid = btn.dataset.auctionId;
+              if (rid && aid && isNotificationDismissed(rid, aid)) {
+                const itemEl = btn.closest('.ipv4-notify-item');
+                if (itemEl) {
+                  itemsToRemove.push({ element: itemEl, ruleId: rid, auctionId: aid });
+                }
+              }
+            });
+
+            // Animate and remove dismissed items, then add next items
+            itemsToRemove.forEach(({ element }) => {
+              const collapseClass = notifyBannerAboveTicker ? 'ipv4-notify-collapse-down' : 'ipv4-notify-collapse-up';
+              element.classList.add(collapseClass);
+            });
+
+            setTimeout(() => {
+              itemsToRemove.forEach(({ element }) => element.remove());
+
+              if (itemsContainer) {
+                // Add next items from queue if there's space
+                const displayedCount = itemsContainer.children.length;
+                const itemsToAdd = 3 - displayedCount;
+
+                if (itemsToAdd > 0 && allPendingNotifications.length > displayedCount) {
+                  const displayedIds = new Set();
+                  itemsContainer.querySelectorAll('.ipv4-notify-item-close').forEach(btn => {
+                    displayedIds.add(`${btn.dataset.ruleId}_${btn.dataset.auctionId}`);
+                  });
+
+                  let added = 0;
+                  for (const n of allPendingNotifications) {
+                    if (added >= itemsToAdd) break;
+                    if (!displayedIds.has(`${n.ruleId}_${n.auctionId}`)) {
+                      const newItemEl = createNotifyItemElement(n.item, n.ruleId, n.auctionId);
+                      newItemEl.classList.add('ipv4-notify-slide-in');
+                      itemsContainer.appendChild(newItemEl);
+                      added++;
+                    }
+                  }
+                }
+
+                // Update count
+                updateNotifyCount();
+
+                // Hide banner if no items left
+                if (itemsContainer.children.length === 0) {
+                  banner.classList.remove('ipv4-notify-visible');
+                  notifyBannerVisible = false;
+                }
+              }
+            }, 200);
+          }
+        }
+
+        // If notification settings changed, trigger an immediate check
+        if (changes[CONFIG.notifyMeEnabledKey] || changes[CONFIG.notifyMeRulesKey]) {
+          log.info('Notification settings changed, triggering check');
+          setTimeout(fetchNewListingsForNotifications, 1000);
+        }
+      });
+      log.info('Cross-tab settings sync listener set up');
+    }
+  }
+
+  function itemMatchesRule(item, rule) {
+    // Check block size
+    if (rule.blockSize && rule.blockSize !== '') {
+      const ruleBlockSize = parseInt(rule.blockSize);
+      const itemBlockSize = parseInt(item.block);
+      if (ruleBlockSize !== itemBlockSize) return false;
+    }
+
+    // Check RIR
+    if (rule.rir && rule.rir !== '') {
+      const itemRir = (item.region || '').toLowerCase();
+      if (rule.rir.toLowerCase() !== itemRir) return false;
+    }
+
+    // Get item price
+    const priceFieldsToTry = ['askingPrice', 'price', 'pricePerAddress', 'listPrice', 'listingPrice', 'perAddress'];
+    let priceStr = '';
+    for (const field of priceFieldsToTry) {
+      priceStr = getValidPriceString(item, field);
+      if (priceStr && priceStr !== '$') break;
+    }
+    const itemPrice = parsePrice(priceStr);
+
+    // Check max price
+    if (rule.maxPrice && rule.maxPrice !== '') {
+      const maxPrice = parseFloat(rule.maxPrice);
+      if (itemPrice !== null && !isNaN(maxPrice) && itemPrice > maxPrice) return false;
+    }
+
+    // Check min price
+    if (rule.minPrice && rule.minPrice !== '') {
+      const minPrice = parseFloat(rule.minPrice);
+      if (itemPrice !== null && !isNaN(minPrice) && itemPrice < minPrice) return false;
+    }
+
+    return true;
+  }
+
+  function createNotifyBanner() {
+    let banner = document.getElementById('ipv4-notify-banner');
+    if (banner) return banner;
+
+    const tickerBanner = document.getElementById('ipv4-banner');
+    if (!tickerBanner) return null;
+
+    banner = document.createElement('div');
+    banner.id = 'ipv4-notify-banner';
+    banner.innerHTML = `
+      <div id="ipv4-notify-header">
+        <span id="ipv4-notify-title">New Listing Match!</span>
+        <button id="ipv4-notify-clear-all">Clear All</button>
+      </div>
+      <div id="ipv4-notify-content">
+        <div id="ipv4-notify-items"></div>
+        <div id="ipv4-notify-count"></div>
+      </div>
+    `;
+    document.body.appendChild(banner);
+
+    // Add click handler for Clear All button
+    const clearAllBtn = banner.querySelector('#ipv4-notify-clear-all');
+    if (clearAllBtn) {
+      clearAllBtn.addEventListener('click', () => {
+        hideNotifyBanner();
+      });
+    }
+
+    return banner;
+  }
+
+  function positionNotifyBanner() {
+    const notifyBanner = document.getElementById('ipv4-notify-banner');
+    const tickerBanner = document.getElementById('ipv4-banner');
+    if (!notifyBanner || !tickerBanner) return;
+
+    const tickerRect = tickerBanner.getBoundingClientRect();
+    const tickerStyle = window.getComputedStyle(tickerBanner);
+    const notifyHeight = notifyBanner.offsetHeight || 150;
+    const viewportHeight = window.innerHeight;
+
+    // Match ticker's right position
+    notifyBanner.style.right = tickerStyle.right;
+
+    // Check space above and below
+    const spaceAbove = tickerRect.top;
+    const spaceBelow = viewportHeight - tickerRect.bottom;
+
+    // Position based on available space
+    if (spaceAbove >= notifyHeight + 10) {
+      // Enough room above - position above
+      notifyBanner.style.bottom = (viewportHeight - tickerRect.top + 8) + 'px';
+      notifyBanner.style.top = 'auto';
+      notifyBannerAboveTicker = true;
+      notifyBanner.classList.add('ipv4-notify-above');
+      notifyBanner.classList.remove('ipv4-notify-below');
+    } else if (spaceBelow >= notifyHeight + 10) {
+      // Not enough room above but enough below - position below
+      notifyBanner.style.top = (tickerRect.bottom + 8) + 'px';
+      notifyBanner.style.bottom = 'auto';
+      notifyBannerAboveTicker = false;
+      notifyBanner.classList.add('ipv4-notify-below');
+      notifyBanner.classList.remove('ipv4-notify-above');
+    } else {
+      // Not enough room either way - position above anyway
+      notifyBanner.style.bottom = (viewportHeight - tickerRect.top + 8) + 'px';
+      notifyBanner.style.top = 'auto';
+      notifyBannerAboveTicker = true;
+      notifyBanner.classList.add('ipv4-notify-above');
+      notifyBanner.classList.remove('ipv4-notify-below');
+    }
+  }
+
+  function createNotifyItemElement(item, ruleId, auctionId) {
+    const priceFieldsToTry = ['askingPrice', 'price', 'pricePerAddress', 'listPrice'];
+    let priceStr = '';
+    for (const field of priceFieldsToTry) {
+      priceStr = getValidPriceString(item, field);
+      if (priceStr && priceStr !== '$') break;
+    }
+
+    const itemEl = document.createElement('div');
+    itemEl.className = 'ipv4-notify-item';
+    itemEl.innerHTML = `
+      <div class="ipv4-notify-item-info">
+        <span>/${item.block || '?'}</span>
+        <span>${(item.region || '').toUpperCase()}</span>
+        <span>${priceStr || '$?'}</span>
+      </div>
+      <div class="ipv4-notify-item-actions">
+        ${auctionId ? `<a href="https://auctions.ipv4.global/auction/${auctionId}" target="_blank" class="ipv4-notify-item-link">View</a>` : ''}
+        <button class="ipv4-notify-item-close" data-rule-id="${ruleId}" data-auction-id="${auctionId}">×</button>
+      </div>
+    `;
+
+    // Add click handler to dismiss when viewing
+    const link = itemEl.querySelector('.ipv4-notify-item-link');
+    if (link) {
+      link.addEventListener('click', () => {
+        if (ruleId && auctionId) dismissNotification(ruleId, auctionId);
+      });
+    }
+
+    // Add click handler for individual X button
+    const closeBtn = itemEl.querySelector('.ipv4-notify-item-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        removeNotifyItem(itemEl, ruleId, auctionId);
+      });
+    }
+
+    return itemEl;
+  }
+
+  function updateNotifyCount() {
+    const banner = document.getElementById('ipv4-notify-banner');
+    if (!banner) return;
+
+    const countEl = banner.querySelector('#ipv4-notify-count');
+    const itemsContainer = banner.querySelector('#ipv4-notify-items');
+    if (!countEl || !itemsContainer) return;
+
+    const displayedCount = itemsContainer.children.length;
+    const remainingCount = allPendingNotifications.length - displayedCount;
+
+    if (remainingCount > 0) {
+      countEl.textContent = `+${remainingCount} more matching listings`;
+      countEl.style.display = 'block';
+    } else {
+      countEl.style.display = 'none';
+    }
+  }
+
+  function removeNotifyItem(itemEl, ruleId, auctionId) {
+    // Dismiss this notification so it doesn't appear again
+    if (ruleId && auctionId) {
+      dismissNotification(ruleId, auctionId);
+    }
+
+    // Remove from pending list
+    allPendingNotifications = allPendingNotifications.filter(
+      n => !(n.ruleId === ruleId && n.auctionId === auctionId)
+    );
+
+    // Animate collapse based on banner position
+    const collapseClass = notifyBannerAboveTicker ? 'ipv4-notify-collapse-down' : 'ipv4-notify-collapse-up';
+    itemEl.classList.add(collapseClass);
+
+    // Remove after animation completes and show next item if available
+    setTimeout(() => {
+      itemEl.remove();
+
+      const banner = document.getElementById('ipv4-notify-banner');
+      const itemsContainer = banner ? banner.querySelector('#ipv4-notify-items') : null;
+
+      if (!itemsContainer) return;
+
+      // Check if we should add the next item from the queue
+      const displayedCount = itemsContainer.children.length;
+      if (displayedCount < 3 && allPendingNotifications.length > displayedCount) {
+        // Find items not currently displayed
+        const displayedIds = new Set();
+        itemsContainer.querySelectorAll('.ipv4-notify-item-close').forEach(btn => {
+          displayedIds.add(`${btn.dataset.ruleId}_${btn.dataset.auctionId}`);
+        });
+
+        // Get next item to display
+        const nextItem = allPendingNotifications.find(
+          n => !displayedIds.has(`${n.ruleId}_${n.auctionId}`)
+        );
+
+        if (nextItem) {
+          const newItemEl = createNotifyItemElement(nextItem.item, nextItem.ruleId, nextItem.auctionId);
+          newItemEl.classList.add('ipv4-notify-slide-in');
+          itemsContainer.appendChild(newItemEl);
+        }
+      }
+
+      // Update the count
+      updateNotifyCount();
+
+      // Hide banner if no items left
+      if (itemsContainer.children.length === 0) {
+        hideNotifyBanner();
+      }
+    }, 200);
+  }
+
+  function showNotifyBanner(matchingItems, matchedRules) {
+    const banner = createNotifyBanner();
+    if (!banner) return;
+
+    const itemsContainer = banner.querySelector('#ipv4-notify-items');
+    if (!itemsContainer) return;
+
+    // Store all matching items for later use (when dismissing shows next item)
+    allPendingNotifications = [...matchingItems];
+
+    itemsContainer.innerHTML = '';
+
+    // Show up to 3 items
+    const displayItems = matchingItems.slice(0, 3);
+    displayItems.forEach(({ item, ruleId, auctionId }) => {
+      const itemEl = createNotifyItemElement(item, ruleId, auctionId);
+      itemsContainer.appendChild(itemEl);
+    });
+
+    // Update count display
+    updateNotifyCount();
+
+    banner.classList.add('ipv4-notify-visible');
+    notifyBannerVisible = true;
+    positionNotifyBanner();
+  }
+
+  function hideNotifyBanner() {
+    const banner = document.getElementById('ipv4-notify-banner');
+    if (banner) {
+      banner.classList.remove('ipv4-notify-visible');
+      // Dismiss ALL pending notifications (not just displayed) for cross-tab sync
+      allPendingNotifications.forEach(({ ruleId, auctionId }) => {
+        if (ruleId && auctionId) dismissNotification(ruleId, auctionId);
+      });
+      // Clear the pending list
+      allPendingNotifications = [];
+    }
+    notifyBannerVisible = false;
+  }
+
+  // Track user interaction for audio permission
+  function setupUserInteractionTracking() {
+    const interactionEvents = ['click', 'mousedown', 'keydown', 'touchstart'];
+    const handleInteraction = () => {
+      if (!userHasInteracted) {
+        userHasInteracted = true;
+        log.info('User interaction detected - audio enabled');
+      }
+    };
+    // Listen on both document and window to catch all interactions
+    interactionEvents.forEach(event => {
+      document.addEventListener(event, handleInteraction, { capture: true, passive: true });
+      window.addEventListener(event, handleInteraction, { capture: true, passive: true });
+    });
+  }
+
+  async function playNotificationSound() {
+    log.info('playNotificationSound called, userHasInteracted:', userHasInteracted);
+
+    // MUST check this first - before ANY audio-related code
+    if (!userHasInteracted) {
+      log.info('Sound skipped - no user interaction yet');
+      return;
+    }
+
+    try {
+      const soundEnabled = await getSetting(CONFIG.notifyMeSoundKey, true);
+      log.info('Sound setting value:', soundEnabled, 'type:', typeof soundEnabled);
+      if (soundEnabled === false) {
+        log.info('Sound skipped - disabled in settings');
+        return;
+      }
+
+      // Create audio context only after confirmed user interaction
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        log.info('AudioContext created');
+      }
+
+      // Resume if suspended
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+        log.info('AudioContext resumed');
+      }
+
+      if (audioContext.state !== 'running') {
+        log.info('AudioContext not running, state:', audioContext.state);
+        return;
+      }
+
+      log.info('Playing notification sound');
+
+      const soundType = await getSetting(CONFIG.notifyMeSoundTypeKey, 'chime');
+
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      switch (soundType) {
+        case 'bell':
+          oscillator.frequency.value = 830;
+          oscillator.type = 'sine';
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.5);
+          break;
+        case 'alert':
+          oscillator.frequency.value = 440;
+          oscillator.type = 'square';
+          gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.3);
+          break;
+        case 'chime':
+        default:
+          oscillator.frequency.value = 587;
+          oscillator.type = 'sine';
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.4);
+          setTimeout(() => {
+            try {
+              const osc2 = audioContext.createOscillator();
+              const gain2 = audioContext.createGain();
+              osc2.connect(gain2);
+              gain2.connect(audioContext.destination);
+              osc2.frequency.value = 880;
+              osc2.type = 'sine';
+              gain2.gain.setValueAtTime(0.25, audioContext.currentTime);
+              gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+              osc2.start(audioContext.currentTime);
+              osc2.stop(audioContext.currentTime + 0.3);
+            } catch (e) {}
+          }, 150);
+          break;
+      }
+    } catch (e) {
+      // Silently ignore all audio errors
+    }
+  }
+
+  async function checkNotifications(items) {
+    if (!items || items.length === 0) {
+      log.info('checkNotifications: No items to check');
+      return;
+    }
+
+    log.info('checkNotifications: Checking', items.length, 'items');
+
+    try {
+      const enabled = await getSetting(CONFIG.notifyMeEnabledKey, false);
+      if (!enabled) {
+        log.info('Notifications disabled');
+        return;
+      }
+
+      const rules = await getSetting(CONFIG.notifyMeRulesKey, []);
+      log.info('Notification rules:', rules);
+      if (!rules || rules.length === 0) {
+        log.info('No notification rules configured');
+        return;
+      }
+
+      // Load dismissed notifications if not already loaded
+      if (Object.keys(dismissedNotifications).length === 0) {
+        await loadDismissedNotifications();
+      }
+
+      const matchingItems = [];
+      const matchedRules = new Set();
+
+      for (const item of items) {
+        const auctionId = getAuctionId(item) || `item_${item.block}_${item.region}_${Date.now()}`;
+
+        for (const rule of rules) {
+          // Skip if already dismissed for this rule
+          if (isNotificationDismissed(rule.id, auctionId)) {
+            log.info('Item already dismissed:', auctionId);
+            continue;
+          }
+
+          const matches = itemMatchesRule(item, rule);
+          log.info('Item match check:', { item: { block: item.block, region: item.region, price: item.askingPrice || item.pricePerAddress }, rule, matches });
+
+          if (matches) {
+            matchingItems.push({ item, ruleId: rule.id, auctionId });
+            matchedRules.add(rule.id);
+            break; // Only match one rule per item
+          }
+        }
+      }
+
+      log.info('Matching items found:', matchingItems.length);
+
+      if (matchingItems.length > 0) {
+        log.info(`Found ${matchingItems.length} matching items for notifications`);
+        showNotifyBanner(matchingItems, matchedRules);
+        playNotificationSound();
+      }
+    } catch (e) {
+      log.error('Error checking notifications:', e);
+    }
+  }
+
+  // Fetch new listings specifically for notification checking
+  async function fetchNewListingsForNotifications() {
+    log.info('fetchNewListingsForNotifications called');
+
+    const enabled = await getSetting(CONFIG.notifyMeEnabledKey, false);
+    log.info('Notifications enabled:', enabled);
+    if (!enabled) return;
+
+    const rules = await getSetting(CONFIG.notifyMeRulesKey, []);
+    log.info('Notification rules count:', rules ? rules.length : 0);
+    if (!rules || rules.length === 0) return;
+
+    if (!isChromeAvailable()) {
+      // Silently return - chrome API not available on this page
+      return;
+    }
+
+    try {
+      // Build request body for new listings (no period filter)
+      const requestBody = {
+        filter: {
+          block: [24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8],
+          region: ["arin", "apnic", "ripe", "afrinic", "lacnic"]
+        },
+        sort: { property: "date", direction: "desc" },
+        offset: 0,
+        limit: 50
+      };
+
+      log.info('Sending notification fetch request to:', CONFIG.newListingsApi);
+
+      chrome.runtime.sendMessage({
+        type: 'fetchData',
+        url: CONFIG.newListingsApi,
+        body: JSON.stringify(requestBody)
+      }, r => {
+        try {
+          if (chrome.runtime.lastError) {
+            log.warn('Notification fetch error:', chrome.runtime.lastError.message);
+            return;
+          }
+          log.info('Notification fetch response:', r ? 'success=' + r.success : 'null');
+          if (r && r.success && r.data) {
+            const d = JSON.parse(r.data);
+            if (d && Array.isArray(d.items)) {
+              log.info('Notification check: Got', d.items.length, 'new listings');
+              if (d.items.length > 0) {
+                log.info('First item sample:', JSON.stringify(d.items[0]).substring(0, 200));
+                checkNotifications(d.items);
+              }
+            } else {
+              log.warn('No items array in response:', d);
+            }
+          } else {
+            log.warn('Invalid response:', r);
+          }
+        } catch (e) {
+          log.error('Error in notification fetch callback:', e);
+        }
+      });
+    } catch (e) {
+      log.error('Error fetching for notifications:', e);
+    }
+  }
 
   // --- UI Update and Interaction Functions ---
   function prepareBannerForExpansion(b) { 
@@ -588,7 +1244,7 @@
     });
 
     function handleMouseMove(e) { if(!dragState.isDragging)return;const deltaX = e.clientX - dragState.startX; const deltaY = e.clientY - dragState.startY; const absX = Math.abs(deltaX); const absY = Math.abs(deltaY); dragState.dragDistance+=Math.abs(e.clientX-dragState.initialClickX);if(!dragState.isHorizontalDrag&&!dragState.isVerticalDrag){if(absX>5||absY>5){if(isMinimized){dragState.isHorizontalDrag=absX>absY*1.5;dragState.isVerticalDrag=!dragState.isHorizontalDrag;}else{dragState.isHorizontalDrag=absX>absY;dragState.isVerticalDrag=!dragState.isHorizontalDrag;}log.info("Drag dir:",{H:dragState.isHorizontalDrag,V:dragState.isVerticalDrag});}}if(isMinimized){if(dragState.isVerticalDrag){handleVerticalDrag(e);return;}if(dragState.isHorizontalDrag&&deltaX<0&&absX>10){if(!isDragExpanding){startDragExpansion(banner,e);}else{handleDragExpansion(banner,e);}return;}return;}if(isDragExpanding){handleDragExpansion(banner,e);return;}if(dragState.isHorizontalDrag&&!isMinimized){const viewportWidth=getViewportWidth();if(dragState.alwaysUseRight||!dragState.isUsingLeft){let newWidth=dragState.startWidth-deltaX;if(deltaX>0&&newWidth<CONFIG.autoMinimizeWidth){log.info("Auto-minimizing (drag right).");preMinimizeWidth=dragState.startWidth;preMinimizeWidthPercent=calculateWidthPercentage(dragState.startWidth);if(dragHandle) dragHandle.style.cursor='auto';toggleMinimized(banner,true);dragState.isDragging=false;return;}const bannerRightPosition=dragState.startRight!==null?dragState.startRight:CONFIG.edgeGap;const maxAllowedWidth=viewportWidth-CONFIG.edgeGap-bannerRightPosition;newWidth=Math.min(newWidth,maxAllowedWidth);newWidth=Math.max(CONFIG.minWidth,newWidth);isAtMaxWidth=isWidthAtMax(newWidth);banner.style.width=newWidth+'px';dragState.lastWidth=newWidth;}else if(dragState.isUsingLeft&&!dragState.ignoreLeftPositioning){let newWidth=dragState.startWidth+deltaX;if(deltaX<0&&newWidth<CONFIG.autoMinimizeWidth){if(dragHandle) dragHandle.style.cursor='auto';toggleMinimized(banner,true);dragState.isDragging=false;return;}newWidth=Math.max(CONFIG.minWidth,newWidth);const bannerLeftPosition=dragState.startLeft!==null?dragState.startLeft:CONFIG.edgeGap;const maxAllowedWidth=viewportWidth-CONFIG.edgeGap-bannerLeftPosition;newWidth=Math.min(newWidth,maxAllowedWidth);banner.style.width=newWidth+'px';dragState.lastWidth=banner.offsetWidth;}}if(dragState.isVerticalDrag){handleVerticalDrag(e);}dragState.lastDragTime=Date.now(); }
-    function handleVerticalDrag(e) { if(!dragState.isDragging||!dragState.isVerticalDrag)return;const b=document.getElementById('ipv4-banner');if(!b)return;const dY=e.clientY-dragState.startY;const vH=getViewportHeight();if(dragState.isUsingTop){let nT=dragState.startPos+dY;nT=Math.max(0,Math.min(nT,vH-CONFIG.bannerHeight));b.style.top=nT+'px';b.style.bottom='auto';}else{let nB=dragState.startPos-dY;nB=Math.max(0,Math.min(nB,vH-CONFIG.bannerHeight));b.style.bottom=nB+'px';b.style.top='auto';}}
+    function handleVerticalDrag(e) { if(!dragState.isDragging||!dragState.isVerticalDrag)return;const b=document.getElementById('ipv4-banner');if(!b)return;const dY=e.clientY-dragState.startY;const vH=getViewportHeight();if(dragState.isUsingTop){let nT=dragState.startPos+dY;nT=Math.max(0,Math.min(nT,vH-CONFIG.bannerHeight));b.style.top=nT+'px';b.style.bottom='auto';}else{let nB=dragState.startPos-dY;nB=Math.max(0,Math.min(nB,vH-CONFIG.bannerHeight));b.style.bottom=nB+'px';b.style.top='auto';}positionNotifyBanner();}
 
     function handleMouseUp(e) {
       if (!dragState.isDragging) return;
@@ -877,8 +1533,55 @@
       reEnableTitleClick();
     }
   }
-  function fetchViaBackground(requestBodyObject, callbackOnFinish) { log.info("Fetching data via background script for URL:", getCurrentApiEndpoint()); chrome.runtime.sendMessage({type:'fetchData',url:getCurrentApiEndpoint(),body:JSON.stringify(requestBodyObject)},r=>{ try { if(chrome.runtime.lastError){log.warn('Runtime err from bg:',chrome.runtime.lastError.message);renderItems(fallbackData[currentViewMode]);return;} if(r&&r.success&&r.data){log.info("Success from bg. Raw data snippet:", r.data.substring(0,200));try{const d=JSON.parse(r.data);log.info("Parsed data from bg:", d);if(d&&Array.isArray(d.items)){if(d.items.length>0){log.info("Parsed items count:",d.items.length);renderItems(d.items);}else{log.info("Parsed items empty. Rendering 'No Data'.");renderItems([]);}return;}log.warn('Parsed data.items not array or missing:',d);renderItems([]);}catch(e){log.error('Error parsing API resp JSON:',e, "Raw data:", r.data);renderItems([]);}} else if(r&&r.error){log.warn('API error from bg:',r.error,"Details:",r.details);renderItems(fallbackData[currentViewMode]);} else{log.warn('Unknown resp from bg:',r);renderItems(fallbackData[currentViewMode]);}} finally { isFetchingData = false; if (callbackOnFinish) callbackOnFinish(); log.info("isFetchingData flag reset to false in fetchViaBackground callback."); } });}
-  async function initialize() { log.info('Initializing banner script...'); const lockAcquired = await acquireInitLock(); if (!lockAcquired) { log.warn('Could not acquire init lock. Aborted.'); return; } log.info("Init lock acquired."); const oldBanner = document.getElementById('ipv4-banner'); if (oldBanner) { log.warn('Old banner found. Removing.'); try { oldBanner.parentNode.removeChild(oldBanner); bannerCreated = false; } catch(e) { log.error("Error removing old banner:", e); }} try { initialViewportWidth = getViewportWidth(); log.info("Getting settings..."); await getAllSettings(); currentViewMode = await getSavedViewMode(); isMinimized = await getSavedMinimizedState(); log.info("Pre-creation states:", { currentViewMode, isMinimized }); log.info("Creating banner..."); const created = await createBanner(); if (created) { log.info("Banner created successfully in initialize."); if (!isMinimized && hasFetchedData) { const scrollContent = document.getElementById('ipv4-scroll-content'); if (scrollContent && scrollContent.innerHTML !== '') { let contentWidth = 1000; const tempEl = document.createElement('div'); tempEl.style.cssText = 'visibility:hidden;position:absolute;white-space:nowrap;font-size:12px;font-family:Arial,sans-serif;'; const uniqueTickerText = scrollContent.innerHTML.split('&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(10))[0] + '&nbsp;&nbsp;&nbsp;&nbsp;'; tempEl.innerHTML = uniqueTickerText; document.body.appendChild(tempEl); contentWidth = tempEl.scrollWidth; document.body.removeChild(tempEl); if (contentWidth < 100) contentWidth = 1000; log.info("Re-applying animation with updated speed post-initialize."); setupScrollAnimation(scrollContent, contentWidth); } } setTimeout(setupMutationObserver, 1000); if (fetchIntervalId) clearInterval(fetchIntervalId); fetchIntervalId = setInterval(fetchData, CONFIG.refreshInterval); log.info(`Refresh interval set: ${CONFIG.refreshInterval / 1000}s.`); setTimeout(() => { const b = document.getElementById('ipv4-banner'); if (b) { log.info("Final position check."); enforceLeftEdgeGap(b); ensureBannerInViewport(b); }}, 500); } else { log.error("Initialization failed: createBanner() returned false."); releaseInitLock(); } addCleanupListeners(); } catch (e) { log.error('CRITICAL ERROR during main initialization:', e, e.stack); releaseInitLock(); } }
+  function fetchViaBackground(requestBodyObject, callbackOnFinish) {
+    log.info("Fetching data via background script for URL:", getCurrentApiEndpoint());
+    chrome.runtime.sendMessage({type:'fetchData',url:getCurrentApiEndpoint(),body:JSON.stringify(requestBodyObject)}, r => {
+      try {
+        if(chrome.runtime.lastError) {
+          log.warn('Runtime err from bg:', chrome.runtime.lastError.message);
+          renderItems(fallbackData[currentViewMode]);
+          return;
+        }
+        if(r && r.success && r.data) {
+          log.info("Success from bg. Raw data snippet:", r.data.substring(0,200));
+          try {
+            const d = JSON.parse(r.data);
+            log.info("Parsed data from bg:", d);
+            if(d && Array.isArray(d.items)) {
+              if(d.items.length > 0) {
+                log.info("Parsed items count:", d.items.length);
+                renderItems(d.items);
+                // Check notifications only for New Listings view
+                if (currentViewMode === VIEW_MODES.NEW_LISTINGS) {
+                  checkNotifications(d.items);
+                }
+              } else {
+                log.info("Parsed items empty. Rendering 'No Data'.");
+                renderItems([]);
+              }
+              return;
+            }
+            log.warn('Parsed data.items not array or missing:', d);
+            renderItems([]);
+          } catch(e) {
+            log.error('Error parsing API resp JSON:', e, "Raw data:", r.data);
+            renderItems([]);
+          }
+        } else if(r && r.error) {
+          log.warn('API error from bg:', r.error, "Details:", r.details);
+          renderItems(fallbackData[currentViewMode]);
+        } else {
+          log.warn('Unknown resp from bg:', r);
+          renderItems(fallbackData[currentViewMode]);
+        }
+      } finally {
+        isFetchingData = false;
+        if (callbackOnFinish) callbackOnFinish();
+        log.info("isFetchingData flag reset to false in fetchViaBackground callback.");
+      }
+    });
+  }
+  async function initialize() { log.info('Initializing banner script...'); const lockAcquired = await acquireInitLock(); if (!lockAcquired) { log.warn('Could not acquire init lock. Aborted.'); return; } log.info("Init lock acquired."); const oldBanner = document.getElementById('ipv4-banner'); if (oldBanner) { log.warn('Old banner found. Removing.'); try { oldBanner.parentNode.removeChild(oldBanner); bannerCreated = false; } catch(e) { log.error("Error removing old banner:", e); }} try { initialViewportWidth = getViewportWidth(); log.info("Getting settings..."); await getAllSettings(); currentViewMode = await getSavedViewMode(); isMinimized = await getSavedMinimizedState(); log.info("Pre-creation states:", { currentViewMode, isMinimized }); log.info("Creating banner..."); const created = await createBanner(); if (created) { log.info("Banner created successfully in initialize."); if (!isMinimized && hasFetchedData) { const scrollContent = document.getElementById('ipv4-scroll-content'); if (scrollContent && scrollContent.innerHTML !== '') { let contentWidth = 1000; const tempEl = document.createElement('div'); tempEl.style.cssText = 'visibility:hidden;position:absolute;white-space:nowrap;font-size:12px;font-family:Arial,sans-serif;'; const uniqueTickerText = scrollContent.innerHTML.split('&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(10))[0] + '&nbsp;&nbsp;&nbsp;&nbsp;'; tempEl.innerHTML = uniqueTickerText; document.body.appendChild(tempEl); contentWidth = tempEl.scrollWidth; document.body.removeChild(tempEl); if (contentWidth < 100) contentWidth = 1000; log.info("Re-applying animation with updated speed post-initialize."); setupScrollAnimation(scrollContent, contentWidth); } } setTimeout(setupMutationObserver, 1000); if (fetchIntervalId) clearInterval(fetchIntervalId); fetchIntervalId = setInterval(fetchData, CONFIG.refreshInterval); log.info(`Refresh interval set: ${CONFIG.refreshInterval / 1000}s.`); if (notificationIntervalId) clearInterval(notificationIntervalId); notificationIntervalId = setInterval(fetchNewListingsForNotifications, CONFIG.refreshInterval); setTimeout(fetchNewListingsForNotifications, 3000); setupDismissedNotificationSync(); setupUserInteractionTracking(); log.info('Notification check interval set.'); setTimeout(() => { const b = document.getElementById('ipv4-banner'); if (b) { log.info("Final position check."); enforceLeftEdgeGap(b); ensureBannerInViewport(b); }}, 500); } else { log.error("Initialization failed: createBanner() returned false."); releaseInitLock(); } addCleanupListeners(); } catch (e) { log.error('CRITICAL ERROR during main initialization:', e, e.stack); releaseInitLock(); } }
   function setupMutationObserver() { if(!CONFIG.mutationObserverEnabled||isDestroyed||observer)return;try{observer=new MutationObserver(m=>{if(isDestroyed)return;for(const mu of m){if(mu.type==='childList'){const b=document.getElementById('ipv4-banner');if(bannerCreated&&!b && !isDestroyed ){const n=Date.now();if(recreationCount>=CONFIG.recreationMaxCount){log.warn(`Banner removed ${recreationCount} times, giving up.`);return;}if(n-lastRecreationTime<CONFIG.recreationDelay){setTimeout(()=>{if(!bannerExists()&&!isDestroyed){log.warn(`Banner removed, recreating (attempt ${recreationCount+1}) delayed`);recreationCount++;lastRecreationTime=Date.now();createBanner().then(ok => { if(ok && !isMinimized && bannerExists()) fetchData(); });}},CONFIG.recreationDelay);}else{log.warn(`Banner removed, recreating (attempt ${recreationCount+1})`);recreationCount++;lastRecreationTime=n;createBanner().then(ok => { if(ok && !isMinimized && bannerExists()) fetchData(); });}}return;}}});observer.observe(document.body,{childList:true,subtree:false});log.info("MutationObserver setup.");}catch(e){log.warn('Error setup MutationObserver:',e);}}
   function addCleanupListeners() { try{window.addEventListener('pagehide',function(event){cleanup(false, event);});window.addEventListener('beforeunload',function(event){cleanup(false, event);});log.info("Cleanup listeners added.");}catch(e){log.warn('Error setup cleanup listeners:',e);}}
   function cleanup(fullCleanup = false, event = null) { 
@@ -891,7 +1594,8 @@
         return;
     }
 
-    if (fetchIntervalId) { clearInterval(fetchIntervalId); fetchIntervalId = null; } 
+    if (fetchIntervalId) { clearInterval(fetchIntervalId); fetchIntervalId = null; }
+    if (notificationIntervalId) { clearInterval(notificationIntervalId); notificationIntervalId = null; } 
     if (animationStyleElement && animationStyleElement.parentNode) { try { animationStyleElement.parentNode.removeChild(animationStyleElement); } catch(e){} animationStyleElement = null; } 
     window.removeEventListener('resize', handleWindowResize); 
     if (observer) { observer.disconnect(); observer = null; } 
