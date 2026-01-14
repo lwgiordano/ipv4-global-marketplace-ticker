@@ -39,7 +39,9 @@
     overflowCheckExtraPadding: 40,
     excludedDomainsStorageKey: 'excludedDomainsText',
     blockSizeFilterStorageKey: 'selectedBlockSize',
+    blockSizesFilterStorageKey: 'selectedBlockSizes',
     rirFilterStorageKey: 'selectedRir',
+    rirsFilterStorageKey: 'selectedRirs',
     animationSpeedSettingKey: 'animationSpeedSetting',
     // Notify Me keys
     notifyMeEnabledKey: 'notifyMeEnabled',
@@ -102,7 +104,7 @@
 
 
   const VIEW_MODES = { PRIOR_SALES: 'priorSales', NEW_LISTINGS: 'newListings' };
-  let bannerCreated = false; let animationStyleElement = null; let fetchIntervalId = null; let isDestroyed = false; let retryCount = 0; let recreationCount = 0; let lastRecreationTime = 0; let observer = null; let isMinimized = false; let isDragExpanding = false; let hasFetchedData = false; let isDuringToggleTransition = false; let preMinimizeWidth = null; let preMinimizeWidthPercent = null; let isAtMaxWidth = false; let initialViewportWidth = 0; let lastPositioningTime = 0; let currentViewMode = VIEW_MODES.PRIOR_SALES;
+  let bannerCreated = false; let animationStyleElement = null; let lastAnimationName = null; let lastAnimationDuration = null; let fetchIntervalId = null; let isDestroyed = false; let retryCount = 0; let recreationCount = 0; let lastRecreationTime = 0; let observer = null; let isMinimized = false; let isDragExpanding = false; let hasFetchedData = false; let isDuringToggleTransition = false; let preMinimizeWidth = null; let preMinimizeWidthPercent = null; let isAtMaxWidth = false; let initialViewportWidth = 0; let lastPositioningTime = 0; let currentViewMode = VIEW_MODES.PRIOR_SALES;
   let dragState = { isDragging: false, startY: 0, startX: 0, startTop: 0, startLeft: 0, startRight: 0, isHorizontalDrag: false, isVerticalDrag: false, startWidth: 0, isUsingTop: true, isUsingLeft: false, lastDragTime: 0, resizingDirection: null, initialClickX: 0, dragDistance: 0, lastWidth: 0, dragStartViewportX: 0, wasNearLeftEdge: false, draggedRightward: false, alwaysUseRight: true, ignoreLeftPositioning: false, expandMinX: 0, initialExpandWidth: CONFIG.initialDragExpandWidth, };
   let resizeTimeout = null; let settingsLoaded = false; let currentSettings = {};
   let isFetchingData = false;
@@ -165,7 +167,7 @@
   function getTodayDate() { const t = new Date(); const y = t.getFullYear(); let m = t.getMonth() + 1; let d = t.getDate(); if (m < 10) m = '0' + m; if (d < 10) d = '0' + d; return `${y}-${m}-${d}`; }
   function getTomorrowDate() { const t = new Date(); const tm = new Date(t); tm.setDate(t.getDate() + 1); const y = tm.getFullYear(); let m = tm.getMonth() + 1; let d = tm.getDate(); if (m < 10) m = '0' + m; if (d < 10) d = '0' + d; return `${y}-${m}-${d}`; }
   function getStartOfCurrentYearDate() { return `${new Date().getFullYear()}-01-01`; }
-  async function getRequestBody() { log.info("Constructing request body for mode:", currentViewMode); let selectedBlockSize = null; let selectedRir = null; if (isChromeAvailable()) { try { const items = await new Promise((resolve, reject) => { chrome.storage.local.get([CONFIG.blockSizeFilterStorageKey, CONFIG.rirFilterStorageKey], result => { if (chrome.runtime.lastError) reject(chrome.runtime.lastError); else resolve(result); }); }); selectedBlockSize = items[CONFIG.blockSizeFilterStorageKey]; selectedRir = items[CONFIG.rirFilterStorageKey]; log.info("Retrieved from storage:", {selectedBlockSize, selectedRir}); } catch (error) { log.warn("Error getting filters from storage:", error.message); } } let blockFilter = [24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8]; if (selectedBlockSize && selectedBlockSize !== "") { const size = parseInt(selectedBlockSize); if (!isNaN(size) && size >= 8 && size <= 24) { blockFilter = [size]; log.info("Applying block size filter:", size); } else { log.warn("Invalid selectedBlockSize, using default block filter:", selectedBlockSize); } } else { log.info("No specific block size selected or 'All Sizes', using default block filter."); } let rirFilter = ["arin", "apnic", "ripe", "afrinic", "lacnic"]; if (selectedRir && selectedRir !== "") { rirFilter = [selectedRir.toLowerCase()]; log.info("Applying RIR filter:", selectedRir); } else { log.info("No specific RIR selected or 'All RIRs', using default RIR filter."); } if (currentViewMode === VIEW_MODES.PRIOR_SALES) { return { filter: { block: blockFilter, region: rirFilter, period: { from: getStartOfCurrentYearDate(), to: getTomorrowDate() }}, sort: { property: "date", direction: "desc" }, offset: 0, limit: 25 }; } else { return { filter: { block: blockFilter, region: rirFilter}, sort: { property: "date", direction: "desc" }, offset: 0, limit: 25 }; } }
+  async function getRequestBody() { log.info("Constructing request body for mode:", currentViewMode); let selectedBlockSize = null; let selectedBlockSizes = null; let selectedRir = null; let selectedRirs = null; if (isChromeAvailable()) { try { const items = await new Promise((resolve, reject) => { chrome.storage.local.get([CONFIG.blockSizeFilterStorageKey, CONFIG.blockSizesFilterStorageKey, CONFIG.rirFilterStorageKey, CONFIG.rirsFilterStorageKey], result => { if (chrome.runtime.lastError) reject(chrome.runtime.lastError); else resolve(result); }); }); selectedBlockSize = items[CONFIG.blockSizeFilterStorageKey]; selectedBlockSizes = items[CONFIG.blockSizesFilterStorageKey]; selectedRir = items[CONFIG.rirFilterStorageKey]; selectedRirs = items[CONFIG.rirsFilterStorageKey]; log.info("Retrieved from storage:", {selectedBlockSize, selectedBlockSizes, selectedRir, selectedRirs}); } catch (error) { log.warn("Error getting filters from storage:", error.message); } } let blockFilter = [24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8]; if (selectedBlockSizes && Array.isArray(selectedBlockSizes) && selectedBlockSizes.length > 0) { blockFilter = selectedBlockSizes.map(s => parseInt(s)).filter(n => !isNaN(n) && n >= 8 && n <= 24); if (blockFilter.length > 0) { log.info("Applying block sizes filter:", blockFilter); } else { blockFilter = [24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8]; log.warn("Invalid selectedBlockSizes, using default block filter"); } } else if (selectedBlockSize && selectedBlockSize !== "") { const size = parseInt(selectedBlockSize); if (!isNaN(size) && size >= 8 && size <= 24) { blockFilter = [size]; log.info("Applying block size filter:", size); } else { log.warn("Invalid selectedBlockSize, using default block filter:", selectedBlockSize); } } else { log.info("No specific block size selected or 'All Sizes', using default block filter."); } let rirFilter = ["arin", "apnic", "ripe", "afrinic", "lacnic"]; if (selectedRirs && Array.isArray(selectedRirs) && selectedRirs.length > 0) { rirFilter = selectedRirs.map(r => r.toLowerCase()); log.info("Applying RIRs filter:", rirFilter); } else if (selectedRir && selectedRir !== "") { rirFilter = [selectedRir.toLowerCase()]; log.info("Applying RIR filter:", selectedRir); } else { log.info("No specific RIR selected or 'All RIRs', using default RIR filter."); } if (currentViewMode === VIEW_MODES.PRIOR_SALES) { return { filter: { block: blockFilter, region: rirFilter, period: { from: getStartOfCurrentYearDate(), to: getTomorrowDate() }}, sort: { property: "date", direction: "desc" }, offset: 0, limit: 25 }; } else { return { filter: { block: blockFilter, region: rirFilter}, sort: { property: "date", direction: "desc" }, offset: 0, limit: 25 }; } }
   function getCurrentApiEndpoint() { return currentViewMode === VIEW_MODES.PRIOR_SALES ? CONFIG.priorSalesApi : CONFIG.newListingsApi; }
   function calculateMaxBannerWidth() { return Math.max(CONFIG.minWidth, getViewportWidth() - (2 * CONFIG.edgeGap)); }
   
@@ -459,17 +461,20 @@
   }
 
   function itemMatchesRule(item, rule) {
-    // Check block size
-    if (rule.blockSize && rule.blockSize !== '') {
-      const ruleBlockSize = parseInt(rule.blockSize);
+    // Check block size (supports both array and single value)
+    const blockSizes = rule.blockSizes || (rule.blockSize && rule.blockSize !== '' ? [rule.blockSize] : []);
+    if (blockSizes.length > 0) {
       const itemBlockSize = parseInt(item.block);
-      if (ruleBlockSize !== itemBlockSize) return false;
+      const matchesBlockSize = blockSizes.some(bs => parseInt(bs) === itemBlockSize);
+      if (!matchesBlockSize) return false;
     }
 
-    // Check RIR
-    if (rule.rir && rule.rir !== '') {
+    // Check RIR (supports both array and single value)
+    const rirs = rule.rirs || (rule.rir && rule.rir !== '' ? [rule.rir] : []);
+    if (rirs.length > 0) {
       const itemRir = (item.region || '').toLowerCase();
-      if (rule.rir.toLowerCase() !== itemRir) return false;
+      const matchesRir = rirs.some(r => r.toLowerCase() === itemRir);
+      if (!matchesRir) return false;
     }
 
     // Rules only trigger when both min AND max price are filled out
@@ -1480,11 +1485,15 @@
 
         log.info(`SetupScrollAnimation: unitWidth=${width}, baseSpeedFactor=${CONFIG.animationBaseSpeedFactor}, speedMultiplier=${currentSpeedMultiplier}, effectiveSpd=${spd}, duration=${dur}s`);
 
+        // Cache animation values for restart function
+        lastAnimationName = an;
+        lastAnimationDuration = `${dur}s`;
+
         animationStyleElement = document.createElement('style');
         animationStyleElement.textContent = `
             @keyframes ${an} {
-                0% { transform: translateX(0); }
-                100% { transform: translateX(-${width}px); }
+                0% { transform: translate3d(0, 0, 0); }
+                100% { transform: translate3d(-${width}px, 0, 0); }
             }
             #ipv4-scroll-content {
                 animation: ${an} ${dur}s linear infinite;
@@ -1586,9 +1595,86 @@
       }
     });
   }
-  async function initialize() { log.info('Initializing banner script...'); const lockAcquired = await acquireInitLock(); if (!lockAcquired) { log.warn('Could not acquire init lock. Aborted.'); return; } log.info("Init lock acquired."); const oldBanner = document.getElementById('ipv4-banner'); if (oldBanner) { log.warn('Old banner found. Removing.'); try { oldBanner.parentNode.removeChild(oldBanner); bannerCreated = false; } catch(e) { log.error("Error removing old banner:", e); }} try { initialViewportWidth = getViewportWidth(); log.info("Getting settings..."); await getAllSettings(); currentViewMode = await getSavedViewMode(); isMinimized = await getSavedMinimizedState(); log.info("Pre-creation states:", { currentViewMode, isMinimized }); log.info("Creating banner..."); const created = await createBanner(); if (created) { log.info("Banner created successfully in initialize."); if (!isMinimized && hasFetchedData) { const scrollContent = document.getElementById('ipv4-scroll-content'); if (scrollContent && scrollContent.innerHTML !== '') { let contentWidth = 1000; const tempEl = document.createElement('div'); tempEl.style.cssText = 'visibility:hidden;position:absolute;white-space:nowrap;font-size:12px;font-family:Arial,sans-serif;'; const uniqueTickerText = scrollContent.innerHTML.split('&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(10))[0] + '&nbsp;&nbsp;&nbsp;&nbsp;'; tempEl.innerHTML = uniqueTickerText; document.body.appendChild(tempEl); contentWidth = tempEl.scrollWidth; document.body.removeChild(tempEl); if (contentWidth < 100) contentWidth = 1000; log.info("Re-applying animation with updated speed post-initialize."); setupScrollAnimation(scrollContent, contentWidth); } } setTimeout(setupMutationObserver, 1000); if (fetchIntervalId) clearInterval(fetchIntervalId); fetchIntervalId = setInterval(fetchData, CONFIG.refreshInterval); log.info(`Refresh interval set: ${CONFIG.refreshInterval / 1000}s.`); if (notificationIntervalId) clearInterval(notificationIntervalId); notificationIntervalId = setInterval(fetchNewListingsForNotifications, CONFIG.refreshInterval); setTimeout(fetchNewListingsForNotifications, 3000); setupDismissedNotificationSync(); setupUserInteractionTracking(); log.info('Notification check interval set.'); setTimeout(() => { const b = document.getElementById('ipv4-banner'); if (b) { log.info("Final position check."); enforceLeftEdgeGap(b); ensureBannerInViewport(b); }}, 500); } else { log.error("Initialization failed: createBanner() returned false."); releaseInitLock(); } addCleanupListeners(); } catch (e) { log.error('CRITICAL ERROR during main initialization:', e, e.stack); releaseInitLock(); } }
+  async function initialize() { log.info('Initializing banner script...'); const lockAcquired = await acquireInitLock(); if (!lockAcquired) { log.warn('Could not acquire init lock. Aborted.'); return; } log.info("Init lock acquired."); const oldBanner = document.getElementById('ipv4-banner'); if (oldBanner) { log.warn('Old banner found. Removing.'); try { oldBanner.parentNode.removeChild(oldBanner); bannerCreated = false; } catch(e) { log.error("Error removing old banner:", e); }} try { initialViewportWidth = getViewportWidth(); log.info("Getting settings..."); await getAllSettings(); currentViewMode = await getSavedViewMode(); isMinimized = await getSavedMinimizedState(); log.info("Pre-creation states:", { currentViewMode, isMinimized }); log.info("Creating banner..."); const created = await createBanner(); if (created) { log.info("Banner created successfully in initialize."); if (!isMinimized && hasFetchedData) { const scrollContent = document.getElementById('ipv4-scroll-content'); if (scrollContent && scrollContent.innerHTML !== '') { let contentWidth = 1000; const tempEl = document.createElement('div'); tempEl.style.cssText = 'visibility:hidden;position:absolute;white-space:nowrap;font-size:12px;font-family:Arial,sans-serif;'; const uniqueTickerText = scrollContent.innerHTML.split('&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(10))[0] + '&nbsp;&nbsp;&nbsp;&nbsp;'; tempEl.innerHTML = uniqueTickerText; document.body.appendChild(tempEl); contentWidth = tempEl.scrollWidth; document.body.removeChild(tempEl); if (contentWidth < 100) contentWidth = 1000; log.info("Re-applying animation with updated speed post-initialize."); setupScrollAnimation(scrollContent, contentWidth); } } setTimeout(setupMutationObserver, 1000); if (fetchIntervalId) clearInterval(fetchIntervalId); fetchIntervalId = setInterval(fetchData, CONFIG.refreshInterval); log.info(`Refresh interval set: ${CONFIG.refreshInterval / 1000}s.`); if (notificationIntervalId) clearInterval(notificationIntervalId); notificationIntervalId = setInterval(fetchNewListingsForNotifications, CONFIG.refreshInterval); setTimeout(fetchNewListingsForNotifications, 3000); setupDismissedNotificationSync(); setupUserInteractionTracking(); log.info('Notification check interval set.'); setTimeout(() => { const b = document.getElementById('ipv4-banner'); if (b) { log.info("Final position check."); enforceLeftEdgeGap(b); ensureBannerInViewport(b); }}, 500); } else { log.error("Initialization failed: createBanner() returned false."); releaseInitLock(); } addCleanupListeners(); setupVisibilityChangeListener(); } catch (e) { log.error('CRITICAL ERROR during main initialization:', e, e.stack); releaseInitLock(); } }
   function setupMutationObserver() { if(!CONFIG.mutationObserverEnabled||isDestroyed||observer)return;try{observer=new MutationObserver(m=>{if(isDestroyed)return;for(const mu of m){if(mu.type==='childList'){const b=document.getElementById('ipv4-banner');if(bannerCreated&&!b && !isDestroyed ){const n=Date.now();if(recreationCount>=CONFIG.recreationMaxCount){log.warn(`Banner removed ${recreationCount} times, giving up.`);return;}if(n-lastRecreationTime<CONFIG.recreationDelay){setTimeout(()=>{if(!bannerExists()&&!isDestroyed){log.warn(`Banner removed, recreating (attempt ${recreationCount+1}) delayed`);recreationCount++;lastRecreationTime=Date.now();createBanner().then(ok => { if(ok && !isMinimized && bannerExists()) fetchData(); });}},CONFIG.recreationDelay);}else{log.warn(`Banner removed, recreating (attempt ${recreationCount+1})`);recreationCount++;lastRecreationTime=n;createBanner().then(ok => { if(ok && !isMinimized && bannerExists()) fetchData(); });}}return;}}});observer.observe(document.body,{childList:true,subtree:false});log.info("MutationObserver setup.");}catch(e){log.warn('Error setup MutationObserver:',e);}}
   function addCleanupListeners() { try{window.addEventListener('pagehide',function(event){cleanup(false, event);});window.addEventListener('beforeunload',function(event){cleanup(false, event);});log.info("Cleanup listeners added.");}catch(e){log.warn('Error setup cleanup listeners:',e);}}
+  function restartAnimationIfNeeded() {
+    if (isDestroyed || !bannerCreated || isMinimized) return;
+    const scrollContent = document.getElementById('ipv4-scroll-content');
+    if (!scrollContent || !scrollContent.innerHTML) return;
+
+    // Calculate content width same way as renderItems does
+    const tempEl = document.createElement('div');
+    tempEl.style.cssText = 'visibility:hidden;position:absolute;white-space:nowrap;font-size:12px;font-family:Arial,sans-serif;';
+    const uniqueTickerText = scrollContent.innerHTML.split('&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(10))[0] + '&nbsp;&nbsp;&nbsp;&nbsp;';
+    tempEl.innerHTML = uniqueTickerText;
+    document.body.appendChild(tempEl);
+    let contentWidth = tempEl.scrollWidth;
+    document.body.removeChild(tempEl);
+    if (contentWidth < 100) contentWidth = 1000;
+
+    // Clear any inline animation styles
+    scrollContent.style.animation = '';
+    scrollContent.style.animationPlayState = '';
+
+    // Call setupScrollAnimation to recreate the animation from scratch
+    log.info('Restarting animation via setupScrollAnimation, width:', contentWidth);
+    setupScrollAnimation(scrollContent, contentWidth);
+  }
+  let lastTransformValue = null;
+  let stuckCheckCount = 0;
+  function setupVisibilityChangeListener() {
+    try {
+      // Handle tab visibility changes
+      document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') {
+          log.info('Page became visible, restarting animation');
+          lastTransformValue = null; // Clear so we don't false-detect as stuck
+          setTimeout(restartAnimationIfNeeded, 100);
+        }
+      });
+      // Handle window focus (catches download dialogs, print dialogs, etc.)
+      window.addEventListener('focus', function() {
+        log.info('Window gained focus, restarting animation');
+        lastTransformValue = null;
+        setTimeout(restartAnimationIfNeeded, 100);
+      });
+      // Health check: detect stuck animation by comparing transform values
+      setInterval(function() {
+        if (isDestroyed || !bannerCreated || isMinimized) return;
+        const scrollContent = document.getElementById('ipv4-scroll-content');
+        if (!scrollContent) return;
+
+        // Skip check if user is hovering (animation is intentionally paused)
+        if (scrollContent.matches(':hover')) {
+          lastTransformValue = null;
+          return;
+        }
+
+        const computedStyle = window.getComputedStyle(scrollContent);
+        const currentTransform = computedStyle.transform;
+
+        // If transform hasn't changed since last check, animation is stuck
+        if (lastTransformValue !== null && currentTransform === lastTransformValue) {
+          stuckCheckCount++;
+          log.info(`Animation stuck check: ${stuckCheckCount}/2, transform=${currentTransform}`);
+          if (stuckCheckCount >= 2) {
+            log.info('Animation stuck, restarting');
+            restartAnimationIfNeeded();
+            stuckCheckCount = 0;
+            lastTransformValue = null; // Clear after restart
+            return;
+          }
+        } else {
+          stuckCheckCount = 0;
+        }
+        lastTransformValue = currentTransform;
+      }, 3000); // Check every 3 seconds for faster recovery
+      log.info('Visibility and focus listeners added.');
+    } catch (e) {
+      log.warn('Error setting up visibility change listener:', e);
+    }
+  }
   function cleanup(fullCleanup = false, event = null) { 
     log.info('Cleaning up resources. Full cleanup:', fullCleanup, "Event type:", event ? event.type : "N/A"); 
     

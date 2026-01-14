@@ -116,6 +116,9 @@
   white-space: nowrap !important;
   line-height: 18px !important;
   font-size: 12px !important;
+  will-change: transform !important;
+  backface-visibility: hidden !important;
+  -webkit-backface-visibility: hidden !important;
 }
 
 /* Styling for sale item parts (ticker text) */

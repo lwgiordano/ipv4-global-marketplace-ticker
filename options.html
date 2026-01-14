@@ -66,6 +66,93 @@
             padding-left: 0;
             padding-right: 0;
         }
+        /* Multi-select dropdown styles */
+        .multi-select-dropdown {
+            position: relative;
+            width: 100%;
+        }
+        .multi-select-header {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background-color: white;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.075);
+            box-sizing: border-box;
+            user-select: none;
+        }
+        .multi-select-header:hover {
+            border-color: #0062FF;
+        }
+        .multi-select-dropdown.open .multi-select-header {
+            border-color: #0062FF;
+        }
+        .dropdown-arrow {
+            font-size: 10px;
+            transition: transform 0.2s ease;
+            color: #666;
+        }
+        .multi-select-dropdown.open .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+        .multi-select-options {
+            position: absolute;
+            top: calc(100% + 2px);
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+        .multi-select-dropdown.open .multi-select-options {
+            display: block;
+        }
+        .checkbox-option {
+            display: flex;
+            align-items: center;
+            padding: 8px 10px;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+            user-select: none;
+            font-weight: normal;
+            margin-bottom: 0;
+        }
+        .checkbox-option:hover {
+            background-color: #f0f4f8;
+        }
+        .checkbox-option input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            margin-right: 8px;
+            cursor: pointer;
+            accent-color: #0062FF;
+        }
+        .checkbox-option span {
+            font-size: 14px;
+            color: #333;
+        }
+        .checkbox-divider {
+            height: 1px;
+            background: #eee;
+            margin: 4px 0;
+        }
+        .selected-text {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+        }
         .save-status {
             margin-top: 15px;
             color: green;
@@ -216,6 +303,33 @@
             border-radius: 4px;
             box-sizing: border-box;
         }
+        .notify-rule-filters .multi-select-dropdown {
+            width: 100%;
+        }
+        .notify-rule-filters .multi-select-header {
+            padding: 5px 8px;
+            font-size: 12px;
+        }
+        .notify-rule-filters .multi-select-options {
+            max-height: 150px;
+        }
+        .notify-rule-filters .checkbox-option {
+            padding: 5px 8px;
+        }
+        .notify-rule-filters .checkbox-option input[type="checkbox"] {
+            width: 14px;
+            height: 14px;
+            margin-right: 6px;
+        }
+        .notify-rule-filters .checkbox-option span {
+            font-size: 12px;
+        }
+        .notify-rule-filters .dropdown-arrow {
+            font-size: 8px;
+        }
+        .notify-rule-filters .selected-text {
+            font-size: 12px;
+        }
         .notify-rule-filters input[type="number"] {
             -moz-appearance: textfield;
         }
@@ -257,24 +371,59 @@
         </div>
 
         <div class="option-group">
-            <label for="blockSizeFilter">Filter by Block Size (Prefix Length):</label>
-            <select id="blockSizeFilter">
-                <option value="">All Sizes (Default)</option>
-                </select>
-            <p class="description">Select a specific IP block size to filter listings and sales. "All Sizes" removes this filter.</p>
+            <label>Filter by Block Size (Prefix Length):</label>
+            <div class="multi-select-dropdown" id="blockSizeDropdown">
+                <div class="multi-select-header">
+                    <span class="selected-text">All Sizes</span>
+                    <span class="dropdown-arrow">▼</span>
+                </div>
+                <div class="multi-select-options">
+                    <label class="checkbox-option">
+                        <input type="checkbox" value="all" checked>
+                        <span>All Sizes</span>
+                    </label>
+                    <div class="checkbox-divider"></div>
+                </div>
+            </div>
+            <p class="description">Select one or more IP block sizes to filter listings and sales. "All Sizes" shows everything.</p>
         </div>
 
         <div class="option-group">
-            <label for="rirFilter">Filter by RIR:</label>
-            <select id="rirFilter">
-                <option value="">All RIRs (Default)</option>
-                <option value="arin">ARIN</option>
-                <option value="ripe">RIPE</option>
-                <option value="apnic">APNIC</option>
-                <option value="lacnic">LACNIC</option>
-                <option value="afrinic">AFRINIC</option>
-            </select>
-            <p class="description">Select a specific Regional Internet Registry to filter listings and sales. "All RIRs" removes this filter.</p>
+            <label>Filter by RIR:</label>
+            <div class="multi-select-dropdown" id="rirDropdown">
+                <div class="multi-select-header">
+                    <span class="selected-text">All RIRs</span>
+                    <span class="dropdown-arrow">▼</span>
+                </div>
+                <div class="multi-select-options">
+                    <label class="checkbox-option">
+                        <input type="checkbox" value="all" checked>
+                        <span>All RIRs</span>
+                    </label>
+                    <div class="checkbox-divider"></div>
+                    <label class="checkbox-option">
+                        <input type="checkbox" value="arin">
+                        <span>ARIN</span>
+                    </label>
+                    <label class="checkbox-option">
+                        <input type="checkbox" value="ripe">
+                        <span>RIPE</span>
+                    </label>
+                    <label class="checkbox-option">
+                        <input type="checkbox" value="apnic">
+                        <span>APNIC</span>
+                    </label>
+                    <label class="checkbox-option">
+                        <input type="checkbox" value="lacnic">
+                        <span>LACNIC</span>
+                    </label>
+                    <label class="checkbox-option">
+                        <input type="checkbox" value="afrinic">
+                        <span>AFRINIC</span>
+                    </label>
+                </div>
+            </div>
+            <p class="description">Select one or more Regional Internet Registries to filter listings and sales. "All RIRs" shows everything.</p>
         </div>
 
         <div class="option-group">

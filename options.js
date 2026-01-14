@@ -2,8 +2,8 @@
 
 document.addEventListener('DOMContentLoaded', function() {
     const excludedDomainsTextarea = document.getElementById('excludedDomains');
-    const blockSizeFilterSelect = document.getElementById('blockSizeFilter');
-    const rirFilterSelect = document.getElementById('rirFilter');
+    const blockSizeDropdown = document.getElementById('blockSizeDropdown');
+    const rirDropdown = document.getElementById('rirDropdown');
     const animationSpeedSlider = document.getElementById('animationSpeedSlider');
     const speedLabel = document.getElementById('speedLabel');
     const saveStatusDiv = document.getElementById('saveStatus');
@@ -28,12 +28,136 @@ document.addEventListener('DOMContentLoaded', function() {
     ];
 
     // Populate block size dropdown (/24 down to /14)
-    for (let i = 24; i >= 14; i--) {
-        const option = document.createElement('option');
-        option.value = i.toString();
-        option.textContent = `/${i}`;
-        blockSizeFilterSelect.appendChild(option);
+    function initializeBlockSizeDropdown(dropdown) {
+        const optionsContainer = dropdown.querySelector('.multi-select-options');
+        for (let i = 24; i >= 14; i--) {
+            const label = document.createElement('label');
+            label.className = 'checkbox-option';
+            label.innerHTML = `
+                <input type="checkbox" value="${i}">
+                <span>/${i}</span>
+            `;
+            optionsContainer.appendChild(label);
+        }
     }
+
+    // Initialize multi-select dropdown functionality
+    function initializeMultiSelectDropdown(dropdown, onChange) {
+        const header = dropdown.querySelector('.multi-select-header');
+        const options = dropdown.querySelector('.multi-select-options');
+        const checkboxes = dropdown.querySelectorAll('input[type="checkbox"]');
+        const allCheckbox = dropdown.querySelector('input[value="all"]');
+
+        // Toggle dropdown
+        header.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // Close other dropdowns
+            document.querySelectorAll('.multi-select-dropdown').forEach(d => {
+                if (d !== dropdown) d.classList.remove('open');
+            });
+            dropdown.classList.toggle('open');
+        });
+
+        // Handle checkbox changes
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                e.stopPropagation();
+
+                if (checkbox === allCheckbox) {
+                    // If "All" is checked, uncheck others
+                    if (checkbox.checked) {
+                        checkboxes.forEach(cb => {
+                            if (cb !== allCheckbox) cb.checked = false;
+                        });
+                    }
+                } else {
+                    // If any other is checked, uncheck "All"
+                    if (checkbox.checked) {
+                        allCheckbox.checked = false;
+                    }
+
+                    // If none are checked, check "All"
+                    const anyChecked = Array.from(checkboxes).some(cb => cb !== allCheckbox && cb.checked);
+                    if (!anyChecked) {
+                        allCheckbox.checked = true;
+                    }
+                }
+
+                updateDropdownText(dropdown);
+                if (onChange) onChange();
+            });
+        });
+
+        // Prevent dropdown from closing when clicking inside options
+        options.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+    }
+
+    // Update dropdown display text based on selections
+    function updateDropdownText(dropdown) {
+        const checkboxes = dropdown.querySelectorAll('input[type="checkbox"]');
+        const allCheckbox = dropdown.querySelector('input[value="all"]');
+        const selectedText = dropdown.querySelector('.selected-text');
+
+        const selected = Array.from(checkboxes).filter(cb => cb.checked && cb !== allCheckbox);
+
+        if (selected.length === 0 || allCheckbox.checked) {
+            const isBlockSize = dropdown.id === 'blockSizeDropdown' || dropdown.classList.contains('rule-block-size-dropdown');
+            selectedText.textContent = isBlockSize ? 'All Sizes' : 'All RIRs';
+        } else {
+            // Show comma-separated values
+            const labels = selected.map(cb => cb.nextElementSibling.textContent);
+            selectedText.textContent = labels.join(', ');
+        }
+    }
+
+    // Get selected values from dropdown as array
+    function getSelectedValues(dropdown) {
+        const checkboxes = dropdown.querySelectorAll('input[type="checkbox"]');
+        const allCheckbox = dropdown.querySelector('input[value="all"]');
+
+        if (allCheckbox && allCheckbox.checked) {
+            return [];
+        }
+
+        return Array.from(checkboxes)
+            .filter(cb => cb.checked && cb.value !== 'all')
+            .map(cb => cb.value);
+    }
+
+    // Set selected values in dropdown from array
+    function setSelectedValues(dropdown, values) {
+        const checkboxes = dropdown.querySelectorAll('input[type="checkbox"]');
+        const allCheckbox = dropdown.querySelector('input[value="all"]');
+
+        if (!values || values.length === 0) {
+            // Select "All" and uncheck others
+            if (allCheckbox) allCheckbox.checked = true;
+            checkboxes.forEach(cb => {
+                if (cb !== allCheckbox) cb.checked = false;
+            });
+        } else {
+            // Uncheck "All" and check specific values
+            if (allCheckbox) allCheckbox.checked = false;
+            checkboxes.forEach(cb => {
+                if (cb !== allCheckbox) {
+                    cb.checked = values.includes(cb.value);
+                }
+            });
+        }
+        updateDropdownText(dropdown);
+    }
+
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', () => {
+        document.querySelectorAll('.multi-select-dropdown').forEach(d => d.classList.remove('open'));
+    });
+
+    // Initialize global dropdowns
+    initializeBlockSizeDropdown(blockSizeDropdown);
+    initializeMultiSelectDropdown(blockSizeDropdown, saveSettings);
+    initializeMultiSelectDropdown(rirDropdown, saveSettings);
 
     // Update speed label based on slider value
     function updateSpeedLabel() {
@@ -57,30 +181,71 @@ document.addEventListener('DOMContentLoaded', function() {
         return 'rule_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
 
-    // Create block size options HTML
-    function createBlockSizeOptions(selectedValue) {
-        let options = '<option value="">All Sizes</option>';
+    // Create block size multi-select dropdown HTML
+    function createBlockSizeDropdownHTML(ruleId) {
+        let optionsHTML = `
+            <label class="checkbox-option">
+                <input type="checkbox" value="all" checked>
+                <span>All Sizes</span>
+            </label>
+            <div class="checkbox-divider"></div>
+        `;
         for (let i = 24; i >= 14; i--) {
-            const selected = selectedValue === i.toString() ? 'selected' : '';
-            options += `<option value="${i}" ${selected}>/${i}</option>`;
+            optionsHTML += `
+                <label class="checkbox-option">
+                    <input type="checkbox" value="${i}">
+                    <span>/${i}</span>
+                </label>
+            `;
         }
-        return options;
+        return `
+            <div class="multi-select-dropdown rule-block-size-dropdown" data-rule-id="${ruleId}">
+                <div class="multi-select-header">
+                    <span class="selected-text">All Sizes</span>
+                    <span class="dropdown-arrow">▼</span>
+                </div>
+                <div class="multi-select-options">
+                    ${optionsHTML}
+                </div>
+            </div>
+        `;
     }
 
-    // Create RIR options HTML
-    function createRirOptions(selectedValue) {
+    // Create RIR multi-select dropdown HTML
+    function createRirDropdownHTML(ruleId) {
         const rirs = [
-            { value: '', label: 'All RIRs' },
             { value: 'arin', label: 'ARIN' },
             { value: 'ripe', label: 'RIPE' },
             { value: 'apnic', label: 'APNIC' },
             { value: 'lacnic', label: 'LACNIC' },
             { value: 'afrinic', label: 'AFRINIC' }
         ];
-        return rirs.map(rir => {
-            const selected = selectedValue === rir.value ? 'selected' : '';
-            return `<option value="${rir.value}" ${selected}>${rir.label}</option>`;
-        }).join('');
+        let optionsHTML = `
+            <label class="checkbox-option">
+                <input type="checkbox" value="all" checked>
+                <span>All RIRs</span>
+            </label>
+            <div class="checkbox-divider"></div>
+        `;
+        rirs.forEach(rir => {
+            optionsHTML += `
+                <label class="checkbox-option">
+                    <input type="checkbox" value="${rir.value}">
+                    <span>${rir.label}</span>
+                </label>
+            `;
+        });
+        return `
+            <div class="multi-select-dropdown rule-rir-dropdown" data-rule-id="${ruleId}">
+                <div class="multi-select-header">
+                    <span class="selected-text">All RIRs</span>
+                    <span class="dropdown-arrow">▼</span>
+                </div>
+                <div class="multi-select-options">
+                    ${optionsHTML}
+                </div>
+            </div>
+        `;
     }
 
     // Render notification rules
@@ -108,15 +273,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="notify-rule-filters">
                     <div>
                         <label>Block Size:</label>
-                        <select class="rule-block-size" data-rule-id="${rule.id}">
-                            ${createBlockSizeOptions(rule.blockSize)}
-                        </select>
+                        ${createBlockSizeDropdownHTML(rule.id)}
                     </div>
                     <div>
                         <label>RIR:</label>
-                        <select class="rule-rir" data-rule-id="${rule.id}">
-                            ${createRirOptions(rule.rir)}
-                        </select>
+                        ${createRirDropdownHTML(rule.id)}
                     </div>
                     <div>
                         <label>Max Price ($/IP):</label>
@@ -131,9 +292,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             `;
             notifyRulesContainer.appendChild(ruleEl);
+
+            // Set initial values for the multi-select dropdowns
+            const blockSizeDropdown = ruleEl.querySelector('.rule-block-size-dropdown');
+            const rirDropdownEl = ruleEl.querySelector('.rule-rir-dropdown');
+
+            // Convert stored values (could be string or array) to array
+            const blockSizeValues = rule.blockSizes || (rule.blockSize ? [rule.blockSize] : []);
+            const rirValues = rule.rirs || (rule.rir ? [rule.rir] : []);
+
+            setSelectedValues(blockSizeDropdown, blockSizeValues);
+            setSelectedValues(rirDropdownEl, rirValues);
+
+            // Initialize multi-select functionality for this rule's dropdowns
+            initializeRuleDropdown(blockSizeDropdown, rule.id);
+            initializeRuleDropdown(rirDropdownEl, rule.id);
         });
 
-        // Add event listeners to new elements
+        // Add event listeners to delete buttons
         notifyRulesContainer.querySelectorAll('.notify-rule-delete').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const ruleId = e.target.dataset.ruleId;
@@ -141,19 +317,105 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
 
-        notifyRulesContainer.querySelectorAll('.rule-block-size, .rule-rir, .rule-max-price, .rule-min-price').forEach(input => {
+        // Add event listeners to price inputs
+        notifyRulesContainer.querySelectorAll('.rule-max-price, .rule-min-price').forEach(input => {
             input.addEventListener('change', (e) => {
-                updateNotifyRule(e.target.dataset.ruleId, e.target);
+                updateNotifyRulePrice(e.target.dataset.ruleId, e.target);
             });
         });
+    }
+
+    // Initialize multi-select dropdown for a notification rule
+    function initializeRuleDropdown(dropdown, ruleId) {
+        const header = dropdown.querySelector('.multi-select-header');
+        const options = dropdown.querySelector('.multi-select-options');
+        const checkboxes = dropdown.querySelectorAll('input[type="checkbox"]');
+        const allCheckbox = dropdown.querySelector('input[value="all"]');
+
+        // Toggle dropdown
+        header.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // Close other dropdowns
+            document.querySelectorAll('.multi-select-dropdown').forEach(d => {
+                if (d !== dropdown) d.classList.remove('open');
+            });
+            dropdown.classList.toggle('open');
+        });
+
+        // Handle checkbox changes
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                e.stopPropagation();
+
+                if (checkbox === allCheckbox) {
+                    if (checkbox.checked) {
+                        checkboxes.forEach(cb => {
+                            if (cb !== allCheckbox) cb.checked = false;
+                        });
+                    }
+                } else {
+                    if (checkbox.checked) {
+                        allCheckbox.checked = false;
+                    }
+                    const anyChecked = Array.from(checkboxes).some(cb => cb !== allCheckbox && cb.checked);
+                    if (!anyChecked) {
+                        allCheckbox.checked = true;
+                    }
+                }
+
+                updateDropdownText(dropdown);
+                updateNotifyRuleFromDropdown(ruleId, dropdown);
+            });
+        });
+
+        // Prevent dropdown from closing when clicking inside options
+        options.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+    }
+
+    // Update notify rule from dropdown change
+    function updateNotifyRuleFromDropdown(ruleId, dropdown) {
+        const rule = notifyRules.find(r => r.id === ruleId);
+        if (!rule) return;
+
+        const values = getSelectedValues(dropdown);
+
+        if (dropdown.classList.contains('rule-block-size-dropdown')) {
+            rule.blockSizes = values;
+            // Keep legacy field for backwards compatibility
+            rule.blockSize = values.length === 1 ? values[0] : '';
+        } else if (dropdown.classList.contains('rule-rir-dropdown')) {
+            rule.rirs = values;
+            // Keep legacy field for backwards compatibility
+            rule.rir = values.length === 1 ? values[0] : '';
+        }
+
+        saveSettings();
+    }
+
+    // Update notify rule price fields
+    function updateNotifyRulePrice(ruleId, inputElement) {
+        const rule = notifyRules.find(r => r.id === ruleId);
+        if (!rule) return;
+
+        if (inputElement.classList.contains('rule-max-price')) {
+            rule.maxPrice = inputElement.value;
+        } else if (inputElement.classList.contains('rule-min-price')) {
+            rule.minPrice = inputElement.value;
+        }
+
+        saveSettings();
     }
 
     // Add new notification rule
     function addNotifyRule() {
         const newRule = {
             id: generateRuleId(),
-            blockSize: '',
-            rir: '',
+            blockSizes: [],
+            rirs: [],
+            blockSize: '',  // Legacy field for backwards compatibility
+            rir: '',        // Legacy field for backwards compatibility
             maxPrice: '',
             minPrice: ''
         };
@@ -178,23 +440,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Update notification rule
-    function updateNotifyRule(ruleId, inputElement) {
-        const rule = notifyRules.find(r => r.id === ruleId);
-        if (!rule) return;
-
-        if (inputElement.classList.contains('rule-block-size')) {
-            rule.blockSize = inputElement.value;
-        } else if (inputElement.classList.contains('rule-rir')) {
-            rule.rir = inputElement.value;
-        } else if (inputElement.classList.contains('rule-max-price')) {
-            rule.maxPrice = inputElement.value;
-        } else if (inputElement.classList.contains('rule-min-price')) {
-            rule.minPrice = inputElement.value;
-        }
-
-        saveSettings();
-    }
 
     // Load saved settings when the options page opens
     function loadSettings() {
@@ -202,7 +447,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const keysToGet = [
                 'excludedDomainsText',
                 'selectedBlockSize',
+                'selectedBlockSizes',
                 'selectedRir',
+                'selectedRirs',
                 'animationSpeedSetting',
                 'notifyMeEnabled',
                 'notifyMeSound',
@@ -218,8 +465,21 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 excludedDomainsTextarea.value = items.excludedDomainsText || '';
-                blockSizeFilterSelect.value = items.selectedBlockSize || '';
-                rirFilterSelect.value = items.selectedRir || '';
+
+                // Load block sizes (new array format takes precedence over legacy single value)
+                let blockSizeValues = items.selectedBlockSizes || [];
+                if (blockSizeValues.length === 0 && items.selectedBlockSize) {
+                    blockSizeValues = [items.selectedBlockSize];
+                }
+                setSelectedValues(blockSizeDropdown, blockSizeValues);
+
+                // Load RIRs (new array format takes precedence over legacy single value)
+                let rirValues = items.selectedRirs || [];
+                if (rirValues.length === 0 && items.selectedRir) {
+                    rirValues = [items.selectedRir];
+                }
+                setSelectedValues(rirDropdown, rirValues);
+
                 animationSpeedSlider.value = items.animationSpeedSetting !== undefined ? items.animationSpeedSetting : '2';
                 updateSpeedLabel();
 
@@ -244,9 +504,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // Save settings when they are changed
     function saveSettings() {
         const excludedDomains = excludedDomainsTextarea.value;
-        const selectedBlockSize = blockSizeFilterSelect.value;
-        const selectedRir = rirFilterSelect.value;
+        const selectedBlockSizes = getSelectedValues(blockSizeDropdown);
+        const selectedRirs = getSelectedValues(rirDropdown);
         const animationSpeedSetting = animationSpeedSlider.value;
+
+        // Legacy single-value fields for backwards compatibility
+        const selectedBlockSize = selectedBlockSizes.length === 1 ? selectedBlockSizes[0] : '';
+        const selectedRir = selectedRirs.length === 1 ? selectedRirs[0] : '';
 
         // Notify Me settings
         const notifyMeEnabled = notifyMeEnabledCheckbox.checked;
@@ -257,7 +521,9 @@ document.addEventListener('DOMContentLoaded', function() {
             chrome.storage.local.set({
                 excludedDomainsText: excludedDomains,
                 selectedBlockSize: selectedBlockSize,
+                selectedBlockSizes: selectedBlockSizes,
                 selectedRir: selectedRir,
+                selectedRirs: selectedRirs,
                 animationSpeedSetting: animationSpeedSetting,
                 notifyMeEnabled: notifyMeEnabled,
                 notifyMeSound: notifyMeSound,
@@ -273,8 +539,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     saveStatusDiv.style.color = 'green';
                     console.log("Settings saved:", {
                         excludedDomainsText: excludedDomains,
-                        selectedBlockSize: selectedBlockSize,
-                        selectedRir: selectedRir,
+                        selectedBlockSizes: selectedBlockSizes,
+                        selectedRirs: selectedRirs,
                         animationSpeedSetting: animationSpeedSetting,
                         notifyMeEnabled: notifyMeEnabled,
                         notifyMeSound: notifyMeSound,
@@ -294,8 +560,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Add event listeners to save on change
     if(excludedDomainsTextarea) excludedDomainsTextarea.addEventListener('input', saveSettings);
-    if(blockSizeFilterSelect) blockSizeFilterSelect.addEventListener('change', saveSettings);
-    if(rirFilterSelect) rirFilterSelect.addEventListener('change', saveSettings);
+    // Multi-select dropdowns have their own event listeners set in initializeMultiSelectDropdown
     if(animationSpeedSlider) animationSpeedSlider.addEventListener('input', () => {
         updateSpeedLabel();
         saveSettings();
