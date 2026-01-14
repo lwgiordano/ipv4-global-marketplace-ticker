@@ -472,6 +472,15 @@
       if (rule.rir.toLowerCase() !== itemRir) return false;
     }
 
+    // Rules only trigger when both min AND max price are filled out
+    const hasMaxPrice = rule.maxPrice && rule.maxPrice !== '';
+    const hasMinPrice = rule.minPrice && rule.minPrice !== '';
+
+    // Both price fields must be filled for the rule to match
+    if (!hasMaxPrice || !hasMinPrice) {
+      return false;
+    }
+
     // Get item price
     const priceFieldsToTry = ['askingPrice', 'price', 'pricePerAddress', 'listPrice', 'listingPrice', 'perAddress'];
     let priceStr = '';
@@ -482,16 +491,12 @@
     const itemPrice = parsePrice(priceStr);
 
     // Check max price
-    if (rule.maxPrice && rule.maxPrice !== '') {
-      const maxPrice = parseFloat(rule.maxPrice);
-      if (itemPrice !== null && !isNaN(maxPrice) && itemPrice > maxPrice) return false;
-    }
+    const maxPrice = parseFloat(rule.maxPrice);
+    if (itemPrice !== null && !isNaN(maxPrice) && itemPrice > maxPrice) return false;
 
     // Check min price
-    if (rule.minPrice && rule.minPrice !== '') {
-      const minPrice = parseFloat(rule.minPrice);
-      if (itemPrice !== null && !isNaN(minPrice) && itemPrice < minPrice) return false;
-    }
+    const minPrice = parseFloat(rule.minPrice);
+    if (itemPrice !== null && !isNaN(minPrice) && itemPrice < minPrice) return false;
 
     return true;
   }
