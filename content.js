@@ -1261,10 +1261,13 @@
       e.stopPropagation();
       toggleGearSubmenu(false);
 
-      // Open analysis page via background script
+      // Open analysis page via background script, passing current view mode
       if (isChromeAvailable()) {
         try {
-          chrome.runtime.sendMessage({ type: 'openAnalysis' }, (response) => {
+          chrome.runtime.sendMessage({
+            type: 'openAnalysis',
+            viewMode: currentViewMode // Pass current view mode to auto-select tab
+          }, (response) => {
             if (chrome.runtime.lastError) {
               log.error('[IPv4 Banner] Error sending openAnalysis message:', chrome.runtime.lastError.message);
             } else if (!response || response.ok === false) {
