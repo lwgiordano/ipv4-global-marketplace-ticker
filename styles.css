@@ -1,4 +1,4 @@
-/* styles.css (v33.3 - Corrected for Gear Menu & New Cursor Requests) */
+/* styles.css (v33.4 - Add NEW indicator badge styling) */
 
 /* Font family override */
 #ipv4-scroll-content > a > span.prefix {
@@ -133,6 +133,40 @@
 #ipv4-banner .price {
   color: #13b5ea !important;
   font-weight: bold !important;
+}
+
+/* NEW indicator badge for recently added items */
+#ipv4-banner .new-indicator {
+  background-color: #ff6b35 !important;
+  color: white !important;
+  font-size: 9px !important;
+  font-weight: bold !important;
+  padding: 1px 4px !important;
+  border-radius: 3px !important;
+  margin-right: 4px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  vertical-align: middle !important;
+  display: inline-block !important;
+  line-height: 1.2 !important;
+  animation: ipv4-new-pulse 2s ease-in-out infinite !important;
+}
+
+@keyframes ipv4-new-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.02);
+  }
+}
+
+/* Styling for ticker items with NEW indicator */
+#ipv4-banner .ticker-link-new,
+#ipv4-banner .ticker-item-new {
+  /* Slightly enhanced visibility for new items */
 }
 
 /* Ticker link styling */
