@@ -1,4 +1,4 @@
-/* styles.css (v33.4 - Add NEW indicator badge styling) */
+/* styles.css (v33.5 - Green centered NEW indicator badge) */
 
 /* Font family override */
 #ipv4-scroll-content > a > span.prefix {
@@ -137,30 +137,24 @@
 
 /* NEW indicator badge for recently added items */
 #ipv4-banner .new-indicator {
-  background-color: #ff6b35 !important;
+  background-color: #28a745 !important;
   color: white !important;
   font-size: 9px !important;
   font-weight: bold !important;
-  padding: 1px 4px !important;
+  padding: 2px 5px !important;
   border-radius: 3px !important;
   margin-right: 4px !important;
   text-transform: uppercase !important;
   letter-spacing: 0.5px !important;
-  vertical-align: middle !important;
-  display: inline-block !important;
-  line-height: 1.2 !important;
-  animation: ipv4-new-pulse 2s ease-in-out infinite !important;
-}
-
-@keyframes ipv4-new-pulse {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.85;
-    transform: scale(1.02);
-  }
+  vertical-align: baseline !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  height: 14px !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  top: -1px !important;
 }
 
 /* Styling for ticker items with NEW indicator */
