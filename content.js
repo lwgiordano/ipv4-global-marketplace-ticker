@@ -1,6 +1,6 @@
-// content.js (v33.6 - Improved CSS isolation and duplicate banner prevention)
+// content.js (v33.7 - Improved duplicate banner prevention with creation lock)
 (async function() {
-  console.log('[IPv4 Banner] content.js script executing (v33.6)...');
+  console.log('[IPv4 Banner] content.js script executing (v33.7)...');
 
   // Prevent duplicate script execution using a DOM marker
   if (window.__ipv4BannerScriptLoaded) {
@@ -119,6 +119,7 @@
   let dragState = { isDragging: false, startY: 0, startX: 0, startTop: 0, startLeft: 0, startRight: 0, isHorizontalDrag: false, isVerticalDrag: false, startWidth: 0, isUsingTop: true, isUsingLeft: false, lastDragTime: 0, resizingDirection: null, initialClickX: 0, dragDistance: 0, lastWidth: 0, dragStartViewportX: 0, wasNearLeftEdge: false, draggedRightward: false, alwaysUseRight: true, ignoreLeftPositioning: false, expandMinX: 0, initialExpandWidth: CONFIG.initialDragExpandWidth, };
   let resizeTimeout = null; let settingsLoaded = false; let currentSettings = {};
   let isFetchingData = false;
+  let isCreatingBanner = false; // Lock to prevent concurrent banner creation
   let isGearSubmenuOpen = false;
   let notifyBannerVisible = false;
   let notifyBannerAboveTicker = true; // Track if banner is positioned above or below ticker
@@ -1466,8 +1467,26 @@
 
   async function createBanner() {
     log.info("createBanner called...");
+
+    // Prevent concurrent banner creation
+    if (isCreatingBanner) {
+      log.info("Banner creation already in progress, skipping.");
+      return false;
+    }
+
+    // Check if banner already exists
+    const existingBanner = document.getElementById('ipv4-banner');
+    if (existingBanner && document.body.contains(existingBanner)) {
+      log.info("Banner already exists in DOM, skipping creation.");
+      bannerCreated = true;
+      return true;
+    }
+
     if (bannerCreated && bannerExists()) { log.info("Banner already exists."); return true; }
     if (bannerCreated && !bannerExists()) { log.info("Flag true but no banner, resetting."); bannerCreated = false; }
+
+    // Set creation lock
+    isCreatingBanner = true;
 
     // Remove ALL existing banners to prevent duplicates (defensive check)
     const existingBanners = document.querySelectorAll('#ipv4-banner');
@@ -1526,6 +1545,7 @@
 
       if (document.getElementById('ipv4-banner')) {
         bannerCreated = true;
+        isCreatingBanner = false; // Release creation lock
         log.info('Banner fully created and verified in DOM.');
         window.addEventListener('resize', handleWindowResize);
         enforceLeftEdgeGap(b);
@@ -1534,22 +1554,24 @@
         releaseInitLock();
         if (!isMinimized) {
           log.info("createBanner: Banner is expanded. Queueing initial fetchData.");
-          hasFetchedData = false; 
+          hasFetchedData = false;
           setTimeout(fetchData, 50);
         } else {
           log.info("createBanner: Banner is minimized. Initial data fetch deferred.");
-          hasFetchedData = false; 
+          hasFetchedData = false;
         }
         return true;
       } else {
         log.error('Banner supposedly appended but not found by ID immediately after creation!');
         bannerCreated = false;
+        isCreatingBanner = false; // Release creation lock
         releaseInitLock();
         return false;
       }
     } catch (e) {
-      log.error('Error in createBanner:', e, e.stack); 
+      log.error('Error in createBanner:', e, e.stack);
       bannerCreated = false;
+      isCreatingBanner = false; // Release creation lock
       releaseInitLock();
       return false;
     }
@@ -1812,7 +1834,7 @@
     });
   }
   async function initialize() { log.info('Initializing banner script...'); const lockAcquired = await acquireInitLock(); if (!lockAcquired) { log.warn('Could not acquire init lock. Aborted.'); return; } log.info("Init lock acquired."); const oldBanner = document.getElementById('ipv4-banner'); if (oldBanner) { log.warn('Old banner found. Removing.'); try { oldBanner.parentNode.removeChild(oldBanner); bannerCreated = false; } catch(e) { log.error("Error removing old banner:", e); }} try { initialViewportWidth = getViewportWidth(); log.info("Getting settings..."); await getAllSettings(); await loadClickedNewItems(); currentViewMode = await getSavedViewMode(); isMinimized = await getSavedMinimizedState(); log.info("Pre-creation states:", { currentViewMode, isMinimized }); log.info("Creating banner..."); const created = await createBanner(); if (created) { log.info("Banner created successfully in initialize."); if (!isMinimized && hasFetchedData) { const scrollContent = document.getElementById('ipv4-scroll-content'); if (scrollContent && scrollContent.innerHTML !== '') { let contentWidth = 1000; const tempEl = document.createElement('div'); tempEl.style.cssText = 'visibility:hidden;position:absolute;white-space:nowrap;font-size:12px;font-family:Arial,sans-serif;'; const uniqueTickerText = scrollContent.innerHTML.split('&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(10))[0] + '&nbsp;&nbsp;&nbsp;&nbsp;'; tempEl.innerHTML = uniqueTickerText; document.body.appendChild(tempEl); contentWidth = tempEl.scrollWidth; document.body.removeChild(tempEl); if (contentWidth < 100) contentWidth = 1000; log.info("Re-applying animation with updated speed post-initialize."); setupScrollAnimation(scrollContent, contentWidth); } } setTimeout(setupMutationObserver, 1000); if (fetchIntervalId) clearInterval(fetchIntervalId); fetchIntervalId = setInterval(fetchData, CONFIG.refreshInterval); log.info(`Refresh interval set: ${CONFIG.refreshInterval / 1000}s.`); if (notificationIntervalId) clearInterval(notificationIntervalId); notificationIntervalId = setInterval(fetchNewListingsForNotifications, CONFIG.refreshInterval); setTimeout(fetchNewListingsForNotifications, 3000); setupDismissedNotificationSync(); setupUserInteractionTracking(); log.info('Notification check interval set.'); setTimeout(() => { const b = document.getElementById('ipv4-banner'); if (b) { log.info("Final position check."); enforceLeftEdgeGap(b); ensureBannerInViewport(b); }}, 500); } else { log.error("Initialization failed: createBanner() returned false."); releaseInitLock(); } addCleanupListeners(); setupVisibilityChangeListener(); } catch (e) { log.error('CRITICAL ERROR during main initialization:', e, e.stack); releaseInitLock(); } }
-  function setupMutationObserver() { if(!CONFIG.mutationObserverEnabled||isDestroyed||observer)return;try{observer=new MutationObserver(m=>{if(isDestroyed)return;for(const mu of m){if(mu.type==='childList'){const b=document.getElementById('ipv4-banner');if(bannerCreated&&!b && !isDestroyed ){const n=Date.now();if(recreationCount>=CONFIG.recreationMaxCount){log.warn(`Banner removed ${recreationCount} times, giving up.`);return;}if(n-lastRecreationTime<CONFIG.recreationDelay){setTimeout(()=>{if(!bannerExists()&&!isDestroyed){log.warn(`Banner removed, recreating (attempt ${recreationCount+1}) delayed`);recreationCount++;lastRecreationTime=Date.now();createBanner().then(ok => { if(ok && !isMinimized && bannerExists()) fetchData(); });}},CONFIG.recreationDelay);}else{log.warn(`Banner removed, recreating (attempt ${recreationCount+1})`);recreationCount++;lastRecreationTime=n;createBanner().then(ok => { if(ok && !isMinimized && bannerExists()) fetchData(); });}}return;}}});observer.observe(document.body,{childList:true,subtree:false});log.info("MutationObserver setup.");}catch(e){log.warn('Error setup MutationObserver:',e);}}
+  function setupMutationObserver() { if(!CONFIG.mutationObserverEnabled||isDestroyed||observer)return;try{observer=new MutationObserver(m=>{if(isDestroyed||isCreatingBanner)return;for(const mu of m){if(mu.type==='childList'){const b=document.getElementById('ipv4-banner');if(bannerCreated&&!b && !isDestroyed && !isCreatingBanner){const n=Date.now();if(recreationCount>=CONFIG.recreationMaxCount){log.warn(`Banner removed ${recreationCount} times, giving up.`);return;}if(n-lastRecreationTime<CONFIG.recreationDelay){setTimeout(()=>{if(!bannerExists()&&!isDestroyed&&!isCreatingBanner){log.warn(`Banner removed, recreating (attempt ${recreationCount+1}) delayed`);recreationCount++;lastRecreationTime=Date.now();createBanner().then(ok => { if(ok && !isMinimized && bannerExists()) fetchData(); });}},CONFIG.recreationDelay);}else{log.warn(`Banner removed, recreating (attempt ${recreationCount+1})`);recreationCount++;lastRecreationTime=n;createBanner().then(ok => { if(ok && !isMinimized && bannerExists()) fetchData(); });}}return;}}});observer.observe(document.body,{childList:true,subtree:false});log.info("MutationObserver setup.");}catch(e){log.warn('Error setup MutationObserver:',e);}}
   function addCleanupListeners() { try{window.addEventListener('pagehide',function(event){cleanup(false, event);});window.addEventListener('beforeunload',function(event){cleanup(false, event);});log.info("Cleanup listeners added.");}catch(e){log.warn('Error setup cleanup listeners:',e);}}
   function restartAnimationIfNeeded() {
     if (isDestroyed || !bannerCreated || isMinimized) return;
