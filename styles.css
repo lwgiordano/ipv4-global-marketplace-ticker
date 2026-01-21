@@ -1,4 +1,4 @@
-/* styles.css (v33.5 - Green centered NEW indicator badge) */
+/* styles.css (v33.6 - Improved CSS isolation for site compatibility) */
 
 /* Font family override */
 #ipv4-scroll-content > a > span.prefix {
@@ -12,8 +12,11 @@
 }
 
 
-/* Base styles for the banner */
+/* Base styles for the banner - with CSS reset to prevent site style conflicts */
 .ipv4-banner-base {
+  /* Reset all inherited styles first */
+  all: initial !important;
+  /* Then apply our specific styles */
   position: fixed !important;
   z-index: 2147483646 !important;
   background-color: white !important;
@@ -40,6 +43,28 @@
   letter-spacing: normal !important;
   word-spacing: normal !important;
   text-shadow: none !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  transform: none !important;
+  animation: none !important;
+  transition: none !important;
+  float: none !important;
+  clear: none !important;
+  clip: auto !important;
+  filter: none !important;
+  max-width: none !important;
+  max-height: none !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+}
+
+/* Reset styles for all banner children to prevent site style conflicts */
+#ipv4-banner *,
+#ipv4-banner *::before,
+#ipv4-banner *::after {
+  all: revert !important;
+  box-sizing: border-box !important;
+  font-family: Arial, sans-serif !important;
 }
 
 /* Styles for when the banner is minimized */
@@ -266,6 +291,8 @@
 
 /* Submenu for Gear Icon */
 #ipv4-gear-submenu {
+  /* Reset all inherited styles first */
+  all: initial !important;
   /* Free-floating overlay, not clipped by the banner */
   position: fixed !important;
   background-color: white !important;
@@ -278,6 +305,8 @@
   display: none;
   font-family: Arial, sans-serif !important;
   font-size: 12px !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
 }
 
 #ipv4-gear-submenu div {
@@ -300,14 +329,11 @@
   vertical-align: baseline !important;
 }
 
+/* Additional resets for banner children - specificity boost */
 #ipv4-banner * {
   background-image: none !important;
   text-shadow: none !important;
-  box-shadow: none !important;
   outline: 0 !important;
-  margin: 0;
-  padding: 0;
-  border: 0;
 }
 
 #ipv4-banner.ipv4-banner-base {

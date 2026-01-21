@@ -1,6 +1,13 @@
-// content.js (v33.5 - Improved NEW indicator: loop-based expiration, click to dismiss)
-(async function() { 
-  console.log('[IPv4 Banner] content.js script executing (v33.5)...');
+// content.js (v33.6 - Improved CSS isolation and duplicate banner prevention)
+(async function() {
+  console.log('[IPv4 Banner] content.js script executing (v33.6)...');
+
+  // Prevent duplicate script execution using a DOM marker
+  if (window.__ipv4BannerScriptLoaded) {
+    console.log('[IPv4 Banner] Script already loaded in this context, skipping.');
+    return;
+  }
+  window.__ipv4BannerScriptLoaded = true;
 
   const CONFIG = {
     refreshInterval: 60000,
@@ -1458,11 +1465,18 @@
   }
 
   async function createBanner() {
-    log.info("createBanner called..."); 
+    log.info("createBanner called...");
     if (bannerCreated && bannerExists()) { log.info("Banner already exists."); return true; }
     if (bannerCreated && !bannerExists()) { log.info("Flag true but no banner, resetting."); bannerCreated = false; }
-    const exB = document.getElementById('ipv4-banner');
-    if (exB) { try { exB.parentNode.removeChild(exB); log.info("Removed remnant banner."); } catch (e) { log.warn('Could not remove remnant banner:', e); } }
+
+    // Remove ALL existing banners to prevent duplicates (defensive check)
+    const existingBanners = document.querySelectorAll('#ipv4-banner');
+    if (existingBanners.length > 0) {
+      log.info(`Found ${existingBanners.length} existing banner(s), removing...`);
+      existingBanners.forEach(banner => {
+        try { banner.parentNode.removeChild(banner); } catch (e) { log.warn('Could not remove banner:', e); }
+      });
+    }
 
     try {
       await getAllSettings();
