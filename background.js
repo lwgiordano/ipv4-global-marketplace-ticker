@@ -16,8 +16,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === 'openAnalysis') {
-    console.log('[IPv4 BG] Received openAnalysis request');
-    chrome.tabs.create({ url: chrome.runtime.getURL('analysis.html') }, () => {
+    console.log('[IPv4 BG] Received openAnalysis request, viewMode:', request.viewMode);
+    // Build URL with optional view mode parameter
+    let url = chrome.runtime.getURL('analysis.html');
+    if (request.viewMode) {
+      // Map ticker view mode to analysis page view
+      // priorSales -> priorSales, newListings -> currentListings
+      const analysisView = request.viewMode === 'newListings' ? 'currentListings' : 'priorSales';
+      url += '?view=' + analysisView;
+    }
+    chrome.tabs.create({ url: url }, () => {
       if (chrome.runtime.lastError) {
         console.error('[IPv4 BG] openAnalysis failed:', chrome.runtime.lastError.message);
         sendResponse({ ok: false, error: chrome.runtime.lastError.message });

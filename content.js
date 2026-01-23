@@ -1,6 +1,13 @@
-// content.js (v33.3 - Fix for getValidPriceString and other regressions)
-(async function() { 
-  console.log('[IPv4 Banner] content.js script executing (v33.3)...');
+// content.js (v33.7 - Improved duplicate banner prevention with creation lock)
+(async function() {
+  console.log('[IPv4 Banner] content.js script executing (v33.7)...');
+
+  // Prevent duplicate script execution using a DOM marker
+  if (window.__ipv4BannerScriptLoaded) {
+    console.log('[IPv4 Banner] Script already loaded in this context, skipping.');
+    return;
+  }
+  window.__ipv4BannerScriptLoaded = true;
 
   const CONFIG = {
     refreshInterval: 60000,
@@ -48,7 +55,11 @@
     notifyMeSoundKey: 'notifyMeSound',
     notifyMeSoundTypeKey: 'notifyMeSoundType',
     notifyMeRulesKey: 'notifyMeRules',
-    notifyMeDismissedKey: 'notifyMeDismissed'
+    notifyMeDismissedKey: 'notifyMeDismissed',
+    // New item indicator
+    itemFirstSeenKey: 'ipv4ItemFirstSeen',
+    clickedNewItemsKey: 'ipv4ClickedNewItems',
+    newIndicatorLoops: 10 // Number of ticker loops before NEW indicator disappears
   };
   const log = {
     info: function(msg, ...args) { if (CONFIG.debug) console.log('[IPv4 Banner]', msg, ...args); },
@@ -108,6 +119,7 @@
   let dragState = { isDragging: false, startY: 0, startX: 0, startTop: 0, startLeft: 0, startRight: 0, isHorizontalDrag: false, isVerticalDrag: false, startWidth: 0, isUsingTop: true, isUsingLeft: false, lastDragTime: 0, resizingDirection: null, initialClickX: 0, dragDistance: 0, lastWidth: 0, dragStartViewportX: 0, wasNearLeftEdge: false, draggedRightward: false, alwaysUseRight: true, ignoreLeftPositioning: false, expandMinX: 0, initialExpandWidth: CONFIG.initialDragExpandWidth, };
   let resizeTimeout = null; let settingsLoaded = false; let currentSettings = {};
   let isFetchingData = false;
+  let isCreatingBanner = false; // Lock to prevent concurrent banner creation
   let isGearSubmenuOpen = false;
   let notifyBannerVisible = false;
   let notifyBannerAboveTicker = true; // Track if banner is positioned above or below ticker
@@ -116,6 +128,10 @@
   let notificationIntervalId = null;
   let audioContext = null; // Persistent audio context for notification sounds
   let userHasInteracted = false; // Track if user has interacted with the page
+  let itemNewLoopCounts = {}; // Maps item IDs to remaining loop counts for "NEW" indicator
+  let clickedNewItems = {}; // Maps item IDs that user has clicked (dismisses NEW indicator)
+  let initialLoadComplete = { priorSales: false, newListings: false }; // Track if initial load is complete per view mode
+  let currentLoopCount = 0; // Track current animation loop for NEW indicator expiration
 
   const fallbackData = { [VIEW_MODES.PRIOR_SALES]: [ { block: 19, region: "arin", pricePerAddress: "$29" }, { block: 24, region: "arin", pricePerAddress: "$32.5" },{ block: 19, region: "ripe", pricePerAddress: "$30" }, { block: 22, region: "ripe", pricePerAddress: "$31.9" },{ block: 22, region: "lacnic", pricePerAddress: "$34.5" }, { block: 22, region: "arin", pricePerAddress: "$34" },{ block: 24, region: "arin", pricePerAddress: "$36" } ], [VIEW_MODES.NEW_LISTINGS]: [ { block: 24, region: "arin", askingPrice: "$35" }, { block: 22, region: "ripe", askingPrice: "$31.5" }, { block: 23, region: "apnic", askingPrice: "$32" }, { block: 21, region: "arin", askingPrice: "$30" }, { block: 24, region: "lacnic", askingPrice: "$33.5" }, { block: 23, region: "arin", askingPrice: "$31" }, { block: 22, region: "arin", askingPrice: "$29.5" } ] };
 
@@ -130,6 +146,159 @@
     }
     return null;
   }
+
+  // --- NEW ITEM INDICATOR FUNCTIONS ---
+  // Generate a unique key for an item (combines view mode with item identifier)
+  function getItemKey(item, viewMode) {
+    const auctionId = getAuctionId(item);
+    if (auctionId) {
+      return `${viewMode}_${auctionId}`;
+    }
+    // Fallback: use block + region as identifier
+    const block = item.block || '';
+    const region = (item.region || '').toLowerCase();
+    return `${viewMode}_${block}_${region}`;
+  }
+
+  // Load clicked items from storage (items user has clicked to dismiss NEW indicator)
+  async function loadClickedNewItems() {
+    try {
+      const saved = await getSetting(CONFIG.clickedNewItemsKey, {});
+      if (saved && typeof saved === 'object') {
+        clickedNewItems = saved;
+        log.info('Loaded clicked new items:', Object.keys(clickedNewItems).length, 'items');
+      }
+    } catch (e) {
+      log.warn('Error loading clicked new items:', e);
+      clickedNewItems = {};
+    }
+  }
+
+  // Save clicked items to storage
+  async function saveClickedNewItems() {
+    try {
+      await saveSetting(CONFIG.clickedNewItemsKey, clickedNewItems);
+    } catch (e) {
+      log.warn('Error saving clicked new items:', e);
+    }
+  }
+
+  // Mark an item as clicked (dismisses NEW indicator)
+  async function markItemClicked(itemKey) {
+    clickedNewItems[itemKey] = true;
+    // Remove from loop counts since it's been clicked
+    delete itemNewLoopCounts[itemKey];
+    await saveClickedNewItems();
+    log.info('Item clicked, NEW indicator dismissed:', itemKey);
+  }
+
+  // Check if an item is "new" (has remaining loops and hasn't been clicked)
+  function isItemNew(item, viewMode) {
+    const key = getItemKey(item, viewMode);
+    // Not new if user has clicked it
+    if (clickedNewItems[key]) return false;
+    // Not new if no loop count (wasn't added after initial load)
+    const loopsRemaining = itemNewLoopCounts[key];
+    return loopsRemaining !== undefined && loopsRemaining > 0;
+  }
+
+  // Track items - on first load, just record them. On subsequent loads, mark new items with loop count.
+  function trackItems(items, viewMode) {
+    if (!items || items.length === 0) return;
+
+    const viewModeKey = viewMode === VIEW_MODES.PRIOR_SALES ? 'priorSales' : 'newListings';
+
+    // Build set of current item keys
+    const currentItemKeys = new Set();
+    for (const item of items) {
+      const key = getItemKey(item, viewMode);
+      currentItemKeys.add(key);
+    }
+
+    // If initial load hasn't completed, just mark it as complete without adding NEW indicators
+    if (!initialLoadComplete[viewModeKey]) {
+      log.info(`Initial load complete for ${viewModeKey}. Items recorded:`, currentItemKeys.size);
+      initialLoadComplete[viewModeKey] = true;
+      // Store the initial items so we can compare on next fetch
+      initialLoadComplete[viewModeKey + '_items'] = currentItemKeys;
+      return;
+    }
+
+    // Check for new items (items not in the previous set)
+    const previousItems = initialLoadComplete[viewModeKey + '_items'] || new Set();
+    let hasNewItems = false;
+
+    for (const key of currentItemKeys) {
+      // If this item wasn't in the previous set and doesn't already have a loop count
+      if (!previousItems.has(key) && itemNewLoopCounts[key] === undefined && !clickedNewItems[key]) {
+        itemNewLoopCounts[key] = CONFIG.newIndicatorLoops;
+        hasNewItems = true;
+        log.info('New item detected, setting loop count:', key, CONFIG.newIndicatorLoops);
+      }
+    }
+
+    // Update stored items for next comparison
+    initialLoadComplete[viewModeKey + '_items'] = currentItemKeys;
+
+    // Clean up loop counts for items no longer in the ticker
+    const keysToDelete = [];
+    for (const key in itemNewLoopCounts) {
+      // Only clean up items from the current view mode
+      if (key.startsWith(viewMode + '_') && !currentItemKeys.has(key)) {
+        keysToDelete.push(key);
+      }
+    }
+    if (keysToDelete.length > 0) {
+      for (const key of keysToDelete) {
+        delete itemNewLoopCounts[key];
+      }
+      log.info('Cleaned up', keysToDelete.length, 'stale loop count entries');
+    }
+
+    // Also clean up old clicked items that are no longer in ticker
+    const clickedKeysToDelete = [];
+    for (const key in clickedNewItems) {
+      if (key.startsWith(viewMode + '_') && !currentItemKeys.has(key)) {
+        clickedKeysToDelete.push(key);
+      }
+    }
+    if (clickedKeysToDelete.length > 0) {
+      for (const key of clickedKeysToDelete) {
+        delete clickedNewItems[key];
+      }
+      saveClickedNewItems();
+      log.info('Cleaned up', clickedKeysToDelete.length, 'old clicked items');
+    }
+  }
+
+  // Called when animation completes one loop - decrements loop counts
+  function onAnimationLoop() {
+    currentLoopCount++;
+    let hasChanges = false;
+    const keysToDelete = [];
+
+    for (const key in itemNewLoopCounts) {
+      itemNewLoopCounts[key]--;
+      if (itemNewLoopCounts[key] <= 0) {
+        keysToDelete.push(key);
+        hasChanges = true;
+      }
+    }
+
+    if (keysToDelete.length > 0) {
+      for (const key of keysToDelete) {
+        delete itemNewLoopCounts[key];
+      }
+      log.info('Loop completed. Removed NEW indicators for:', keysToDelete.length, 'items');
+      // Re-render to update the display
+      const scrollContent = document.getElementById('ipv4-scroll-content');
+      if (scrollContent && !isMinimized) {
+        // Trigger a re-render by fetching data again
+        fetchData();
+      }
+    }
+  }
+
   function isChromeAvailable() { try { return typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id && chrome.runtime.sendMessage; } catch (e) { return false; } }
   async function getAllSettings() { return new Promise(resolve => { if (!isChromeAvailable()) { resolve(currentSettings); return; } chrome.storage.local.get(null, items => { if (chrome.runtime.lastError) { log.warn('Error reading all settings:', chrome.runtime.lastError.message); resolve(currentSettings); } else { currentSettings = items || {}; settingsLoaded = true; resolve(currentSettings); } }); }); }
   async function getSetting(key, defaultValue) { if (settingsLoaded && key in currentSettings) return currentSettings[key]; return new Promise(resolve => { if (!isChromeAvailable()) { resolve(defaultValue); return; } chrome.storage.local.get([key], result => { if (chrome.runtime.lastError) { log.warn(`Error reading setting ${key}:`, chrome.runtime.lastError.message); resolve(defaultValue); } else { const value = result[key]; currentSettings[key] = value; resolve(value !== undefined ? value : defaultValue); } }); }); }
@@ -192,7 +361,36 @@
   }
   function _createLogoLinkElement() { const ll = document.createElement('a'); ll.id = 'ipv4-logo-link'; ll.href = 'https://auctions.ipv4.global'; ll.target = '_blank'; return ll;}
   function _createTitleElement(initialViewMode) { const t = document.createElement('span'); t.id = 'ipv4-title'; t.classList.add('banner-title-style'); t.title = initialViewMode === VIEW_MODES.PRIOR_SALES ? "Click to switch to New Listings" : "Click to switch to Prior Sales"; t.innerHTML = initialViewMode === VIEW_MODES.PRIOR_SALES ? 'Prior Sales:' : 'New Listings:'; const vp = 4; t.style.lineHeight = `${CONFIG.bannerHeight - vp}px`; t.addEventListener('click', (e) => {e.preventDefault();e.stopPropagation(); if(!isDuringToggleTransition && !isDragExpanding) toggleViewMode();}); return t;}
-  function _createScrollContainerElement() { const sc = document.createElement('div'); sc.id = 'ipv4-scroll-container'; const scc = document.createElement('div'); scc.id = 'ipv4-scroll-content'; sc.appendChild(scc); return sc;}
+  function _createScrollContainerElement() {
+    const sc = document.createElement('div');
+    sc.id = 'ipv4-scroll-container';
+    const scc = document.createElement('div');
+    scc.id = 'ipv4-scroll-content';
+
+    // Add click handler for ticker links to dismiss NEW indicator
+    sc.addEventListener('click', (e) => {
+      const link = e.target.closest('.ticker-link, .ticker-item-new');
+      if (link) {
+        const itemKey = link.getAttribute('data-item-key');
+        if (itemKey && itemNewLoopCounts[itemKey] !== undefined) {
+          markItemClicked(itemKey);
+          // Remove NEW indicator immediately from the clicked element
+          const newBadge = link.querySelector('.new-indicator');
+          if (newBadge) newBadge.remove();
+          link.classList.remove('ticker-link-new', 'ticker-item-new');
+        }
+      }
+    });
+
+    // Track animation loops to decrement NEW indicator counters
+    scc.addEventListener('animationiteration', () => {
+      log.info('Animation loop completed');
+      onAnimationLoop();
+    });
+
+    sc.appendChild(scc);
+    return sc;
+  }
 
   function _createGearButtonElement() {
     const gearButton = document.createElement('div');
@@ -1071,10 +1269,13 @@
       e.stopPropagation();
       toggleGearSubmenu(false);
 
-      // Open analysis page via background script
+      // Open analysis page via background script, passing current view mode
       if (isChromeAvailable()) {
         try {
-          chrome.runtime.sendMessage({ type: 'openAnalysis' }, (response) => {
+          chrome.runtime.sendMessage({
+            type: 'openAnalysis',
+            viewMode: currentViewMode // Pass current view mode to auto-select tab
+          }, (response) => {
             if (chrome.runtime.lastError) {
               log.error('[IPv4 Banner] Error sending openAnalysis message:', chrome.runtime.lastError.message);
             } else if (!response || response.ok === false) {
@@ -1265,11 +1466,36 @@
   }
 
   async function createBanner() {
-    log.info("createBanner called..."); 
+    log.info("createBanner called...");
+
+    // Prevent concurrent banner creation
+    if (isCreatingBanner) {
+      log.info("Banner creation already in progress, skipping.");
+      return false;
+    }
+
+    // Check if banner already exists
+    const existingBanner = document.getElementById('ipv4-banner');
+    if (existingBanner && document.body.contains(existingBanner)) {
+      log.info("Banner already exists in DOM, skipping creation.");
+      bannerCreated = true;
+      return true;
+    }
+
     if (bannerCreated && bannerExists()) { log.info("Banner already exists."); return true; }
     if (bannerCreated && !bannerExists()) { log.info("Flag true but no banner, resetting."); bannerCreated = false; }
-    const exB = document.getElementById('ipv4-banner');
-    if (exB) { try { exB.parentNode.removeChild(exB); log.info("Removed remnant banner."); } catch (e) { log.warn('Could not remove remnant banner:', e); } }
+
+    // Set creation lock
+    isCreatingBanner = true;
+
+    // Remove ALL existing banners to prevent duplicates (defensive check)
+    const existingBanners = document.querySelectorAll('#ipv4-banner');
+    if (existingBanners.length > 0) {
+      log.info(`Found ${existingBanners.length} existing banner(s), removing...`);
+      existingBanners.forEach(banner => {
+        try { banner.parentNode.removeChild(banner); } catch (e) { log.warn('Could not remove banner:', e); }
+      });
+    }
 
     try {
       await getAllSettings();
@@ -1319,6 +1545,7 @@
 
       if (document.getElementById('ipv4-banner')) {
         bannerCreated = true;
+        isCreatingBanner = false; // Release creation lock
         log.info('Banner fully created and verified in DOM.');
         window.addEventListener('resize', handleWindowResize);
         enforceLeftEdgeGap(b);
@@ -1327,22 +1554,24 @@
         releaseInitLock();
         if (!isMinimized) {
           log.info("createBanner: Banner is expanded. Queueing initial fetchData.");
-          hasFetchedData = false; 
+          hasFetchedData = false;
           setTimeout(fetchData, 50);
         } else {
           log.info("createBanner: Banner is minimized. Initial data fetch deferred.");
-          hasFetchedData = false; 
+          hasFetchedData = false;
         }
         return true;
       } else {
         log.error('Banner supposedly appended but not found by ID immediately after creation!');
         bannerCreated = false;
+        isCreatingBanner = false; // Release creation lock
         releaseInitLock();
         return false;
       }
     } catch (e) {
-      log.error('Error in createBanner:', e, e.stack); 
+      log.error('Error in createBanner:', e, e.stack);
       bannerCreated = false;
+      isCreatingBanner = false; // Release creation lock
       releaseInitLock();
       return false;
     }
@@ -1409,12 +1638,19 @@
 
                 // Get auction ID and create link if available
                 const auctionId = getAuctionId(item);
-                const itemContent = `<span class="prefix">/${blockStr}</span> <span class="registry">${regionStr}</span> <span class="price">${priceStr}</span>`;
+
+                // Check if this item is new (has remaining loops and hasn't been clicked)
+                const itemIsNew = isItemNew(item, currentViewMode);
+                const itemKey = getItemKey(item, currentViewMode);
+                const newBadge = itemIsNew ? '<span class="new-indicator">NEW</span> ' : '';
+
+                const itemContent = `${newBadge}<span class="prefix">/${blockStr}</span> <span class="registry">${regionStr}</span> <span class="price">${priceStr}</span>`;
 
                 if (auctionId) {
-                    return `<a href="https://auctions.ipv4.global/auction/${auctionId}" target="_blank" class="ticker-link">${itemContent}</a>`;
+                    // Add data-item-key attribute for click handling to dismiss NEW indicator
+                    return `<a href="https://auctions.ipv4.global/auction/${auctionId}" target="_blank" class="ticker-link${itemIsNew ? ' ticker-link-new' : ''}" data-item-key="${itemKey}">${itemContent}</a>`;
                 } else {
-                    return itemContent;
+                    return `<span class="${itemIsNew ? 'ticker-item-new' : ''}" data-item-key="${itemKey}">${itemContent}</span>`;
                 }
             });
             const validItems = htmlItems.filter(item => item);
@@ -1564,6 +1800,8 @@
             if(d && Array.isArray(d.items)) {
               if(d.items.length > 0) {
                 log.info("Parsed items count:", d.items.length);
+                // Track items for "NEW" indicator (only marks new items after initial load)
+                trackItems(d.items, currentViewMode);
                 renderItems(d.items);
                 // Check notifications only for New Listings view
                 if (currentViewMode === VIEW_MODES.NEW_LISTINGS) {
@@ -1595,8 +1833,8 @@
       }
     });
   }
-  async function initialize() { log.info('Initializing banner script...'); const lockAcquired = await acquireInitLock(); if (!lockAcquired) { log.warn('Could not acquire init lock. Aborted.'); return; } log.info("Init lock acquired."); const oldBanner = document.getElementById('ipv4-banner'); if (oldBanner) { log.warn('Old banner found. Removing.'); try { oldBanner.parentNode.removeChild(oldBanner); bannerCreated = false; } catch(e) { log.error("Error removing old banner:", e); }} try { initialViewportWidth = getViewportWidth(); log.info("Getting settings..."); await getAllSettings(); currentViewMode = await getSavedViewMode(); isMinimized = await getSavedMinimizedState(); log.info("Pre-creation states:", { currentViewMode, isMinimized }); log.info("Creating banner..."); const created = await createBanner(); if (created) { log.info("Banner created successfully in initialize."); if (!isMinimized && hasFetchedData) { const scrollContent = document.getElementById('ipv4-scroll-content'); if (scrollContent && scrollContent.innerHTML !== '') { let contentWidth = 1000; const tempEl = document.createElement('div'); tempEl.style.cssText = 'visibility:hidden;position:absolute;white-space:nowrap;font-size:12px;font-family:Arial,sans-serif;'; const uniqueTickerText = scrollContent.innerHTML.split('&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(10))[0] + '&nbsp;&nbsp;&nbsp;&nbsp;'; tempEl.innerHTML = uniqueTickerText; document.body.appendChild(tempEl); contentWidth = tempEl.scrollWidth; document.body.removeChild(tempEl); if (contentWidth < 100) contentWidth = 1000; log.info("Re-applying animation with updated speed post-initialize."); setupScrollAnimation(scrollContent, contentWidth); } } setTimeout(setupMutationObserver, 1000); if (fetchIntervalId) clearInterval(fetchIntervalId); fetchIntervalId = setInterval(fetchData, CONFIG.refreshInterval); log.info(`Refresh interval set: ${CONFIG.refreshInterval / 1000}s.`); if (notificationIntervalId) clearInterval(notificationIntervalId); notificationIntervalId = setInterval(fetchNewListingsForNotifications, CONFIG.refreshInterval); setTimeout(fetchNewListingsForNotifications, 3000); setupDismissedNotificationSync(); setupUserInteractionTracking(); log.info('Notification check interval set.'); setTimeout(() => { const b = document.getElementById('ipv4-banner'); if (b) { log.info("Final position check."); enforceLeftEdgeGap(b); ensureBannerInViewport(b); }}, 500); } else { log.error("Initialization failed: createBanner() returned false."); releaseInitLock(); } addCleanupListeners(); setupVisibilityChangeListener(); } catch (e) { log.error('CRITICAL ERROR during main initialization:', e, e.stack); releaseInitLock(); } }
-  function setupMutationObserver() { if(!CONFIG.mutationObserverEnabled||isDestroyed||observer)return;try{observer=new MutationObserver(m=>{if(isDestroyed)return;for(const mu of m){if(mu.type==='childList'){const b=document.getElementById('ipv4-banner');if(bannerCreated&&!b && !isDestroyed ){const n=Date.now();if(recreationCount>=CONFIG.recreationMaxCount){log.warn(`Banner removed ${recreationCount} times, giving up.`);return;}if(n-lastRecreationTime<CONFIG.recreationDelay){setTimeout(()=>{if(!bannerExists()&&!isDestroyed){log.warn(`Banner removed, recreating (attempt ${recreationCount+1}) delayed`);recreationCount++;lastRecreationTime=Date.now();createBanner().then(ok => { if(ok && !isMinimized && bannerExists()) fetchData(); });}},CONFIG.recreationDelay);}else{log.warn(`Banner removed, recreating (attempt ${recreationCount+1})`);recreationCount++;lastRecreationTime=n;createBanner().then(ok => { if(ok && !isMinimized && bannerExists()) fetchData(); });}}return;}}});observer.observe(document.body,{childList:true,subtree:false});log.info("MutationObserver setup.");}catch(e){log.warn('Error setup MutationObserver:',e);}}
+  async function initialize() { log.info('Initializing banner script...'); const lockAcquired = await acquireInitLock(); if (!lockAcquired) { log.warn('Could not acquire init lock. Aborted.'); return; } log.info("Init lock acquired."); const oldBanner = document.getElementById('ipv4-banner'); if (oldBanner) { log.warn('Old banner found. Removing.'); try { oldBanner.parentNode.removeChild(oldBanner); bannerCreated = false; } catch(e) { log.error("Error removing old banner:", e); }} try { initialViewportWidth = getViewportWidth(); log.info("Getting settings..."); await getAllSettings(); await loadClickedNewItems(); currentViewMode = await getSavedViewMode(); isMinimized = await getSavedMinimizedState(); log.info("Pre-creation states:", { currentViewMode, isMinimized }); log.info("Creating banner..."); const created = await createBanner(); if (created) { log.info("Banner created successfully in initialize."); if (!isMinimized && hasFetchedData) { const scrollContent = document.getElementById('ipv4-scroll-content'); if (scrollContent && scrollContent.innerHTML !== '') { let contentWidth = 1000; const tempEl = document.createElement('div'); tempEl.style.cssText = 'visibility:hidden;position:absolute;white-space:nowrap;font-size:12px;font-family:Arial,sans-serif;'; const uniqueTickerText = scrollContent.innerHTML.split('&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(10))[0] + '&nbsp;&nbsp;&nbsp;&nbsp;'; tempEl.innerHTML = uniqueTickerText; document.body.appendChild(tempEl); contentWidth = tempEl.scrollWidth; document.body.removeChild(tempEl); if (contentWidth < 100) contentWidth = 1000; log.info("Re-applying animation with updated speed post-initialize."); setupScrollAnimation(scrollContent, contentWidth); } } setTimeout(setupMutationObserver, 1000); if (fetchIntervalId) clearInterval(fetchIntervalId); fetchIntervalId = setInterval(fetchData, CONFIG.refreshInterval); log.info(`Refresh interval set: ${CONFIG.refreshInterval / 1000}s.`); if (notificationIntervalId) clearInterval(notificationIntervalId); notificationIntervalId = setInterval(fetchNewListingsForNotifications, CONFIG.refreshInterval); setTimeout(fetchNewListingsForNotifications, 3000); setupDismissedNotificationSync(); setupUserInteractionTracking(); log.info('Notification check interval set.'); setTimeout(() => { const b = document.getElementById('ipv4-banner'); if (b) { log.info("Final position check."); enforceLeftEdgeGap(b); ensureBannerInViewport(b); }}, 500); } else { log.error("Initialization failed: createBanner() returned false."); releaseInitLock(); } addCleanupListeners(); setupVisibilityChangeListener(); } catch (e) { log.error('CRITICAL ERROR during main initialization:', e, e.stack); releaseInitLock(); } }
+  function setupMutationObserver() { if(!CONFIG.mutationObserverEnabled||isDestroyed||observer)return;try{observer=new MutationObserver(m=>{if(isDestroyed||isCreatingBanner)return;for(const mu of m){if(mu.type==='childList'){const b=document.getElementById('ipv4-banner');if(bannerCreated&&!b && !isDestroyed && !isCreatingBanner){const n=Date.now();if(recreationCount>=CONFIG.recreationMaxCount){log.warn(`Banner removed ${recreationCount} times, giving up.`);return;}if(n-lastRecreationTime<CONFIG.recreationDelay){setTimeout(()=>{if(!bannerExists()&&!isDestroyed&&!isCreatingBanner){log.warn(`Banner removed, recreating (attempt ${recreationCount+1}) delayed`);recreationCount++;lastRecreationTime=Date.now();createBanner().then(ok => { if(ok && !isMinimized && bannerExists()) fetchData(); });}},CONFIG.recreationDelay);}else{log.warn(`Banner removed, recreating (attempt ${recreationCount+1})`);recreationCount++;lastRecreationTime=n;createBanner().then(ok => { if(ok && !isMinimized && bannerExists()) fetchData(); });}}return;}}});observer.observe(document.body,{childList:true,subtree:false});log.info("MutationObserver setup.");}catch(e){log.warn('Error setup MutationObserver:',e);}}
   function addCleanupListeners() { try{window.addEventListener('pagehide',function(event){cleanup(false, event);});window.addEventListener('beforeunload',function(event){cleanup(false, event);});log.info("Cleanup listeners added.");}catch(e){log.warn('Error setup cleanup listeners:',e);}}
   function restartAnimationIfNeeded() {
     if (isDestroyed || !bannerCreated || isMinimized) return;

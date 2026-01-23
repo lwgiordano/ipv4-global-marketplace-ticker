@@ -513,14 +513,17 @@ class SimpleChart {
 
                 this.ctx.beginPath();
                 this.ctx.moveTo(this.padding.left, this.height - this.padding.bottom);
+                let lastX = this.padding.left;
                 for (let index = 0; index <= pointsToDraw; index++) {
                     if (index >= data.length) break;
                     const value = data[index];
                     const x = this.padding.left + index * pointSpacing;
                     const y = this.padding.top + chartHeight - ((value - minValue) / valueRange) * chartHeight;
                     this.ctx.lineTo(x, y);
+                    lastX = x; // Track the actual last x position
                 }
-                this.ctx.lineTo(this.padding.left + pointsToDraw * pointSpacing, this.height - this.padding.bottom);
+                // Draw straight down (vertical edge) from the last data point
+                this.ctx.lineTo(lastX, this.height - this.padding.bottom);
                 this.ctx.closePath();
                 this.ctx.fill();
                 this.ctx.restore();
@@ -1233,6 +1236,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (viewToggle) {
         viewToggle.classList.add('init');
     }
+
+    // Check URL parameter for initial view selection
+    const urlParams = new URLSearchParams(window.location.search);
+    const viewParam = urlParams.get('view');
+    if (viewParam === 'currentListings') {
+        // Auto-select Current Listings tab
+        toggleView('currentListings');
+    }
+    // Default is priorSales which is already active in HTML
 
     // Load initial data
     loadData();

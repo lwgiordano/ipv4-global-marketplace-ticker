@@ -1,4 +1,4 @@
-/* styles.css (v33.3 - Corrected for Gear Menu & New Cursor Requests) */
+/* styles.css (v33.7 - Reverted aggressive CSS reset, keeping targeted fixes) */
 
 /* Font family override */
 #ipv4-scroll-content > a > span.prefix {
@@ -40,6 +40,14 @@
   letter-spacing: normal !important;
   word-spacing: normal !important;
   text-shadow: none !important;
+  /* Additional resets for problematic sites */
+  visibility: visible !important;
+  pointer-events: auto !important;
+  transform: none !important;
+  filter: none !important;
+  clip: auto !important;
+  -webkit-clip-path: none !important;
+  clip-path: none !important;
 }
 
 /* Styles for when the banner is minimized */
@@ -133,6 +141,34 @@
 #ipv4-banner .price {
   color: #13b5ea !important;
   font-weight: bold !important;
+}
+
+/* NEW indicator badge for recently added items */
+#ipv4-banner .new-indicator {
+  background-color: #28a745 !important;
+  color: white !important;
+  font-size: 9px !important;
+  font-weight: bold !important;
+  padding: 2px 5px !important;
+  border-radius: 3px !important;
+  margin-right: 4px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  vertical-align: baseline !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  height: 14px !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  top: -1px !important;
+}
+
+/* Styling for ticker items with NEW indicator */
+#ipv4-banner .ticker-link-new,
+#ipv4-banner .ticker-item-new {
+  /* Slightly enhanced visibility for new items */
 }
 
 /* Ticker link styling */
@@ -272,14 +308,11 @@
   vertical-align: baseline !important;
 }
 
+/* Additional resets for banner children - specificity boost */
 #ipv4-banner * {
   background-image: none !important;
   text-shadow: none !important;
-  box-shadow: none !important;
   outline: 0 !important;
-  margin: 0;
-  padding: 0;
-  border: 0;
 }
 
 #ipv4-banner.ipv4-banner-base {
