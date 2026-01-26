@@ -1,6 +1,6 @@
-// content.js (v33.8 - Fix font loading errors by isolating temp elements from page styles)
+// content.js (v33.9 - Use Shadow DOM for text measurement to prevent page font loading errors)
 (async function() {
-  console.log('[IPv4 Banner] content.js script executing (v33.8)...');
+  console.log('[IPv4 Banner] content.js script executing (v33.9)...');
 
   // Prevent duplicate script execution using a DOM marker
   if (window.__ipv4BannerScriptLoaded) {
@@ -330,6 +330,20 @@
   async function saveWidth(w) { try { if (w >= CONFIG.minWidth) { await saveSetting(CONFIG.widthKey, w.toString()); const wp = calculateWidthPercentage(w); await saveSetting(CONFIG.widthPercentKey, wp.toString()); const imw = isWidthAtMax(w); isAtMaxWidth = imw; await saveSetting(CONFIG.maxWidthFlag, imw); preMinimizeWidth = w; preMinimizeWidthPercent = wp; }} catch (e) { log.warn('Error save width:', e); } }
   function getViewportWidth() { return document.documentElement.clientWidth; }
   function getViewportHeight() { return document.documentElement.clientHeight; }
+  function measureTextWidth(htmlContent) {
+    // Use Shadow DOM to completely isolate from page styles (prevents font loading errors from page CSS)
+    const host = document.createElement('div');
+    host.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;';
+    const shadow = host.attachShadow({ mode: 'closed' });
+    const measureEl = document.createElement('div');
+    measureEl.style.cssText = 'white-space:nowrap;font-size:12px;font-family:Arial,sans-serif;display:inline-block;';
+    measureEl.innerHTML = htmlContent;
+    shadow.appendChild(measureEl);
+    document.body.appendChild(host);
+    const width = measureEl.scrollWidth;
+    document.body.removeChild(host);
+    return width;
+  }
   function getScrollbarWidth() { return window.innerWidth - document.documentElement.clientWidth; }
   async function getSavedMinimizedState() { try { const s = await getSetting(CONFIG.minimizedStateKey); if (s !== null && s !== undefined) return s === 'true' || s === true; } catch (e) { log.warn('Error read minimized state:', e); } return false; }
   async function saveMinimizedState(s) { try { await saveSetting(CONFIG.minimizedStateKey, s.toString()); } catch (e) { log.warn('Error save minimized state:', e); } }
@@ -1666,13 +1680,7 @@
             }
         }
 
-        let unitWidth;
-        const tempEl = document.createElement('div');
-        tempEl.style.cssText = 'all:initial;visibility:hidden;position:absolute;white-space:nowrap;font-size:12px;font-family:Arial,sans-serif;';
-        tempEl.innerHTML = singleUnitText;
-        document.body.appendChild(tempEl);
-        unitWidth = tempEl.scrollWidth;
-        document.body.removeChild(tempEl);
+        let unitWidth = measureTextWidth(singleUnitText);
 
         if (unitWidth < 10 && isNoDataOrError) unitWidth = 200; 
         else if (unitWidth < 10) unitWidth = 100; 
@@ -1833,7 +1841,7 @@
       }
     });
   }
-  async function initialize() { log.info('Initializing banner script...'); const lockAcquired = await acquireInitLock(); if (!lockAcquired) { log.warn('Could not acquire init lock. Aborted.'); return; } log.info("Init lock acquired."); const oldBanner = document.getElementById('ipv4-banner'); if (oldBanner) { log.warn('Old banner found. Removing.'); try { oldBanner.parentNode.removeChild(oldBanner); bannerCreated = false; } catch(e) { log.error("Error removing old banner:", e); }} try { initialViewportWidth = getViewportWidth(); log.info("Getting settings..."); await getAllSettings(); await loadClickedNewItems(); currentViewMode = await getSavedViewMode(); isMinimized = await getSavedMinimizedState(); log.info("Pre-creation states:", { currentViewMode, isMinimized }); log.info("Creating banner..."); const created = await createBanner(); if (created) { log.info("Banner created successfully in initialize."); if (!isMinimized && hasFetchedData) { const scrollContent = document.getElementById('ipv4-scroll-content'); if (scrollContent && scrollContent.innerHTML !== '') { let contentWidth = 1000; const tempEl = document.createElement('div'); tempEl.style.cssText = 'all:initial;visibility:hidden;position:absolute;white-space:nowrap;font-size:12px;font-family:Arial,sans-serif;'; const uniqueTickerText = scrollContent.innerHTML.split('&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(10))[0] + '&nbsp;&nbsp;&nbsp;&nbsp;'; tempEl.innerHTML = uniqueTickerText; document.body.appendChild(tempEl); contentWidth = tempEl.scrollWidth; document.body.removeChild(tempEl); if (contentWidth < 100) contentWidth = 1000; log.info("Re-applying animation with updated speed post-initialize."); setupScrollAnimation(scrollContent, contentWidth); } } setTimeout(setupMutationObserver, 1000); if (fetchIntervalId) clearInterval(fetchIntervalId); fetchIntervalId = setInterval(fetchData, CONFIG.refreshInterval); log.info(`Refresh interval set: ${CONFIG.refreshInterval / 1000}s.`); if (notificationIntervalId) clearInterval(notificationIntervalId); notificationIntervalId = setInterval(fetchNewListingsForNotifications, CONFIG.refreshInterval); setTimeout(fetchNewListingsForNotifications, 3000); setupDismissedNotificationSync(); setupUserInteractionTracking(); log.info('Notification check interval set.'); setTimeout(() => { const b = document.getElementById('ipv4-banner'); if (b) { log.info("Final position check."); enforceLeftEdgeGap(b); ensureBannerInViewport(b); }}, 500); } else { log.error("Initialization failed: createBanner() returned false."); releaseInitLock(); } addCleanupListeners(); setupVisibilityChangeListener(); } catch (e) { log.error('CRITICAL ERROR during main initialization:', e, e.stack); releaseInitLock(); } }
+  async function initialize() { log.info('Initializing banner script...'); const lockAcquired = await acquireInitLock(); if (!lockAcquired) { log.warn('Could not acquire init lock. Aborted.'); return; } log.info("Init lock acquired."); const oldBanner = document.getElementById('ipv4-banner'); if (oldBanner) { log.warn('Old banner found. Removing.'); try { oldBanner.parentNode.removeChild(oldBanner); bannerCreated = false; } catch(e) { log.error("Error removing old banner:", e); }} try { initialViewportWidth = getViewportWidth(); log.info("Getting settings..."); await getAllSettings(); await loadClickedNewItems(); currentViewMode = await getSavedViewMode(); isMinimized = await getSavedMinimizedState(); log.info("Pre-creation states:", { currentViewMode, isMinimized }); log.info("Creating banner..."); const created = await createBanner(); if (created) { log.info("Banner created successfully in initialize."); if (!isMinimized && hasFetchedData) { const scrollContent = document.getElementById('ipv4-scroll-content'); if (scrollContent && scrollContent.innerHTML !== '') { const uniqueTickerText = scrollContent.innerHTML.split('&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(10))[0] + '&nbsp;&nbsp;&nbsp;&nbsp;'; let contentWidth = measureTextWidth(uniqueTickerText); if (contentWidth < 100) contentWidth = 1000; log.info("Re-applying animation with updated speed post-initialize."); setupScrollAnimation(scrollContent, contentWidth); } } setTimeout(setupMutationObserver, 1000); if (fetchIntervalId) clearInterval(fetchIntervalId); fetchIntervalId = setInterval(fetchData, CONFIG.refreshInterval); log.info(`Refresh interval set: ${CONFIG.refreshInterval / 1000}s.`); if (notificationIntervalId) clearInterval(notificationIntervalId); notificationIntervalId = setInterval(fetchNewListingsForNotifications, CONFIG.refreshInterval); setTimeout(fetchNewListingsForNotifications, 3000); setupDismissedNotificationSync(); setupUserInteractionTracking(); log.info('Notification check interval set.'); setTimeout(() => { const b = document.getElementById('ipv4-banner'); if (b) { log.info("Final position check."); enforceLeftEdgeGap(b); ensureBannerInViewport(b); }}, 500); } else { log.error("Initialization failed: createBanner() returned false."); releaseInitLock(); } addCleanupListeners(); setupVisibilityChangeListener(); } catch (e) { log.error('CRITICAL ERROR during main initialization:', e, e.stack); releaseInitLock(); } }
   function setupMutationObserver() { if(!CONFIG.mutationObserverEnabled||isDestroyed||observer)return;try{observer=new MutationObserver(m=>{if(isDestroyed||isCreatingBanner)return;for(const mu of m){if(mu.type==='childList'){const b=document.getElementById('ipv4-banner');if(bannerCreated&&!b && !isDestroyed && !isCreatingBanner){const n=Date.now();if(recreationCount>=CONFIG.recreationMaxCount){log.warn(`Banner removed ${recreationCount} times, giving up.`);return;}if(n-lastRecreationTime<CONFIG.recreationDelay){setTimeout(()=>{if(!bannerExists()&&!isDestroyed&&!isCreatingBanner){log.warn(`Banner removed, recreating (attempt ${recreationCount+1}) delayed`);recreationCount++;lastRecreationTime=Date.now();createBanner().then(ok => { if(ok && !isMinimized && bannerExists()) fetchData(); });}},CONFIG.recreationDelay);}else{log.warn(`Banner removed, recreating (attempt ${recreationCount+1})`);recreationCount++;lastRecreationTime=n;createBanner().then(ok => { if(ok && !isMinimized && bannerExists()) fetchData(); });}}return;}}});observer.observe(document.body,{childList:true,subtree:false});log.info("MutationObserver setup.");}catch(e){log.warn('Error setup MutationObserver:',e);}}
   function addCleanupListeners() { try{window.addEventListener('pagehide',function(event){cleanup(false, event);});window.addEventListener('beforeunload',function(event){cleanup(false, event);});log.info("Cleanup listeners added.");}catch(e){log.warn('Error setup cleanup listeners:',e);}}
   function restartAnimationIfNeeded() {
@@ -1842,13 +1850,8 @@
     if (!scrollContent || !scrollContent.innerHTML) return;
 
     // Calculate content width same way as renderItems does
-    const tempEl = document.createElement('div');
-    tempEl.style.cssText = 'all:initial;visibility:hidden;position:absolute;white-space:nowrap;font-size:12px;font-family:Arial,sans-serif;';
     const uniqueTickerText = scrollContent.innerHTML.split('&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(10))[0] + '&nbsp;&nbsp;&nbsp;&nbsp;';
-    tempEl.innerHTML = uniqueTickerText;
-    document.body.appendChild(tempEl);
-    let contentWidth = tempEl.scrollWidth;
-    document.body.removeChild(tempEl);
+    let contentWidth = measureTextWidth(uniqueTickerText);
     if (contentWidth < 100) contentWidth = 1000;
 
     // Clear any inline animation styles
