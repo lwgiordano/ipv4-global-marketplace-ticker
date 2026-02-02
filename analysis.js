@@ -203,6 +203,65 @@ class SimpleChart {
             }
         }
 
+        // For multiline charts - find closest point across all series
+        if (this.chartMetadata && this.chartMetadata.type === 'multiline') {
+            const meta = this.chartMetadata;
+
+            // Use actual rendered canvas dimensions
+            const actualWidth = rect.width;
+            const actualHeight = rect.height;
+
+            // Recalculate chart dimensions based on actual size
+            const scaleX = actualWidth / this.width;
+            const scaleY = actualHeight / this.height;
+
+            const ap = meta.adjustedPadding;
+            const actualChartLeft = ap.left * scaleX;
+            const actualChartTop = ap.top * scaleY;
+            const actualChartRight = actualWidth - ap.right * scaleX;
+            const actualChartBottom = (this.height - ap.bottom) * scaleY;
+            const actualChartWidth = actualChartRight - actualChartLeft;
+            const actualChartHeight = actualChartBottom - actualChartTop;
+
+            // Check if mouse is within chart area
+            if (x < actualChartLeft || x > actualChartRight || y < actualChartTop || y > actualChartBottom) {
+                this.hideTooltip();
+                return;
+            }
+
+            const numPoints = meta.labels.length;
+            const actualPointSpacing = actualChartWidth / (numPoints - 1 || 1);
+
+            // Find closest point across all series
+            let closestPoint = null;
+            let closestDistance = Infinity;
+            let closestSeries = null;
+
+            meta.series.forEach(s => {
+                for (let i = 0; i < numPoints; i++) {
+                    const value = s.data[i];
+                    if (value === null || value === undefined) continue;
+
+                    const pointX = actualChartLeft + i * actualPointSpacing;
+                    const pointY = actualChartTop + actualChartHeight - ((value - meta.minValue) / meta.valueRange) * actualChartHeight;
+
+                    const distance = Math.sqrt(Math.pow(x - pointX, 2) + Math.pow(y - pointY, 2));
+                    if (distance < closestDistance) {
+                        closestDistance = distance;
+                        closestPoint = { index: i, x: pointX, y: pointY, value: value };
+                        closestSeries = s;
+                    }
+                }
+            });
+
+            // Show tooltip if close enough to a point
+            if (closestPoint && closestDistance < 25 && closestSeries) {
+                const label = `<strong>${closestSeries.name}</strong><br>${meta.labels[closestPoint.index]}: ${formatPrice(closestPoint.value)}`;
+                this.showTooltip({ label: label }, e.clientX, e.clientY);
+                return;
+            }
+        }
+
         // For pie charts - check stored data points
         for (const point of this.dataPoints) {
             if (point.x !== undefined && point.y !== undefined && point.radius !== undefined) {
@@ -586,11 +645,11 @@ class SimpleChart {
             return;
         }
 
-        // Calculate legend dimensions - position at top
-        const legendHeight = 25;
+        // Legend at bottom - allocate space
+        const legendHeight = 35;
         const adjustedPadding = {
             ...this.padding,
-            top: this.padding.top + legendHeight
+            bottom: this.padding.bottom + legendHeight
         };
 
         const chartWidth = this.width - adjustedPadding.left - adjustedPadding.right;
@@ -610,6 +669,11 @@ class SimpleChart {
 
         if (globalMin === Infinity) globalMin = 0;
         if (globalMax === -Infinity) globalMax = 1;
+
+        // Add 5% padding to top and bottom of range for better visual
+        const rangePadding = (globalMax - globalMin) * 0.05;
+        globalMin = Math.max(0, globalMin - rangePadding);
+        globalMax = globalMax + rangePadding;
         const valueRange = globalMax - globalMin || 1;
 
         const pointSpacing = chartWidth / (labels.length - 1 || 1);
@@ -621,10 +685,38 @@ class SimpleChart {
             labels: labels,
             minValue: globalMin,
             maxValue: globalMax,
-            valueRange: valueRange
+            valueRange: valueRange,
+            adjustedPadding: adjustedPadding,
+            chartWidth: chartWidth,
+            chartHeight: chartHeight,
+            pointSpacing: pointSpacing
         };
 
         this.animate((progress) => {
+            // Draw horizontal grid lines first (behind everything)
+            const numGridLines = 5;
+            this.ctx.strokeStyle = '#E8EAEB';
+            this.ctx.lineWidth = 1;
+            this.ctx.fillStyle = COLORS.text;
+            this.ctx.font = '11px Proxima Nova, Arial';
+
+            for (let i = 0; i <= numGridLines; i++) {
+                const y = adjustedPadding.top + (chartHeight / numGridLines) * i;
+                const value = globalMax - (valueRange / numGridLines) * i;
+
+                // Dashed grid lines
+                this.ctx.setLineDash([4, 4]);
+                this.ctx.beginPath();
+                this.ctx.moveTo(adjustedPadding.left, y);
+                this.ctx.lineTo(this.width - adjustedPadding.right, y);
+                this.ctx.stroke();
+                this.ctx.setLineDash([]);
+
+                // Y-axis labels
+                this.ctx.textAlign = 'right';
+                this.ctx.fillText(formatPrice(value), adjustedPadding.left - 10, y + 4);
+            }
+
             // Draw axes
             this.ctx.strokeStyle = COLORS.grid;
             this.ctx.lineWidth = 1;
@@ -634,56 +726,50 @@ class SimpleChart {
             this.ctx.lineTo(this.width - adjustedPadding.right, this.height - adjustedPadding.bottom);
             this.ctx.stroke();
 
-            // Draw horizontal grid lines
-            const numGridLines = 5;
-            this.ctx.strokeStyle = '#F0F2F2';
-            this.ctx.fillStyle = COLORS.text;
-            this.ctx.font = '12px Proxima Nova, Arial';
-            for (let i = 0; i <= numGridLines; i++) {
-                const y = adjustedPadding.top + (chartHeight / numGridLines) * i;
-                const value = globalMax - (valueRange / numGridLines) * i;
-                this.ctx.beginPath();
-                this.ctx.moveTo(adjustedPadding.left, y);
-                this.ctx.lineTo(this.width - adjustedPadding.right, y);
-                this.ctx.stroke();
-                this.ctx.textAlign = 'right';
-                this.ctx.fillText(formatPrice(value), adjustedPadding.left - 8, y + 4);
-                this.ctx.textAlign = 'left';
-            }
+            // Calculate how many points to draw based on animation progress
+            const pointsToDraw = Math.floor(labels.length * progress);
 
             // Draw each series
             validSeries.forEach((s, seriesIndex) => {
                 const data = s.data;
                 const color = s.color;
 
-                // Calculate how many points to draw based on animation progress
-                const pointsToDraw = Math.floor(data.length * progress);
-
-                // Draw line
+                // Draw line with smooth curves
                 this.ctx.strokeStyle = color;
-                this.ctx.lineWidth = 2;
+                this.ctx.lineWidth = 2.5;
+                this.ctx.lineCap = 'round';
+                this.ctx.lineJoin = 'round';
                 this.ctx.beginPath();
 
                 let started = false;
+                let prevPoint = null;
+
                 for (let index = 0; index <= pointsToDraw; index++) {
                     if (index >= data.length) break;
 
                     const value = data[index];
-                    if (value === null || value === undefined) continue;
+                    if (value === null || value === undefined) {
+                        prevPoint = null;
+                        continue;
+                    }
 
                     const x = adjustedPadding.left + index * pointSpacing;
                     const y = adjustedPadding.top + chartHeight - ((value - globalMin) / valueRange) * chartHeight;
 
-                    if (!started) {
+                    if (!started || prevPoint === null) {
                         this.ctx.moveTo(x, y);
                         started = true;
                     } else {
-                        this.ctx.lineTo(x, y);
+                        // Smooth curve using quadratic bezier
+                        const cpX = (prevPoint.x + x) / 2;
+                        this.ctx.quadraticCurveTo(prevPoint.x, prevPoint.y, cpX, (prevPoint.y + y) / 2);
+                        this.ctx.quadraticCurveTo(cpX, (prevPoint.y + y) / 2, x, y);
                     }
+                    prevPoint = { x, y };
                 }
                 this.ctx.stroke();
 
-                // Draw points
+                // Draw points (smaller, cleaner dots)
                 for (let index = 0; index <= pointsToDraw; index++) {
                     if (index >= data.length) break;
 
@@ -694,75 +780,75 @@ class SimpleChart {
                     const y = adjustedPadding.top + chartHeight - ((value - globalMin) / valueRange) * chartHeight;
 
                     // Animate point appearance
-                    const pointProgress = Math.min((progress * data.length - index) * 2, 1);
+                    const pointProgress = Math.min((progress * data.length - index) * 3, 1);
                     if (pointProgress > 0) {
+                        // White border around point
+                        this.ctx.fillStyle = '#FFFFFF';
+                        this.ctx.beginPath();
+                        this.ctx.arc(x, y, 4 * pointProgress, 0, 2 * Math.PI);
+                        this.ctx.fill();
+
+                        // Colored center
                         this.ctx.fillStyle = color;
                         this.ctx.beginPath();
                         this.ctx.arc(x, y, 3 * pointProgress, 0, 2 * Math.PI);
                         this.ctx.fill();
-
-                        // Add to data points for tooltip
-                        if (progress === 1) {
-                            this.dataPoints.push({
-                                x: x,
-                                y: y,
-                                radius: 15,
-                                label: `${s.name} - ${labels[index]}: ${formatPrice(value)}`
-                            });
-                        }
                     }
                 }
             });
 
-            // Draw labels (show every nth label to avoid overlap)
-            const labelStep = Math.ceil(labels.length / 10);
+            // Draw x-axis labels (show every nth label to avoid overlap)
+            const labelStep = Math.ceil(labels.length / 8);
             this.ctx.fillStyle = COLORS.text;
-            this.ctx.font = '11px Proxima Nova, Arial';
+            this.ctx.font = '10px Proxima Nova, Arial';
             this.ctx.textAlign = 'center';
             labels.forEach((label, index) => {
                 if (index % labelStep === 0 || index === labels.length - 1) {
                     const x = adjustedPadding.left + index * pointSpacing;
-                    const y = this.height - adjustedPadding.bottom + 20;
+                    const y = this.height - adjustedPadding.bottom + 15;
                     this.ctx.save();
                     this.ctx.translate(x, y);
-                    this.ctx.rotate(-Math.PI / 4);
+                    this.ctx.rotate(-Math.PI / 6);
                     this.ctx.fillText(label, 0, 0);
                     this.ctx.restore();
                 }
             });
 
-            // Draw legend at top (after animation completes for cleaner look)
-            if (progress === 1) {
-                this.drawMultiLineLegend(validSeries);
-            }
+            // Draw legend at bottom (always visible during animation)
+            this.drawMultiLineLegend(validSeries, adjustedPadding);
         });
     }
 
-    drawMultiLineLegend(series) {
-        const legendY = this.padding.top - 5;
-        let legendX = this.padding.left;
+    drawMultiLineLegend(series, adjustedPadding) {
+        const legendY = this.height - 18;
 
+        // Calculate total legend width to center it
         this.ctx.font = '11px Proxima Nova, Arial';
+        let totalWidth = 0;
+        series.forEach((s, index) => {
+            totalWidth += 12 + 6 + this.ctx.measureText(s.name).width;
+            if (index < series.length - 1) totalWidth += 20; // spacing between items
+        });
+
+        let legendX = (this.width - totalWidth) / 2;
+
         this.ctx.textBaseline = 'middle';
 
         series.forEach((s, index) => {
-            // Draw colored line segment
-            this.ctx.strokeStyle = s.color;
-            this.ctx.lineWidth = 3;
+            // Draw colored circle
+            this.ctx.fillStyle = s.color;
             this.ctx.beginPath();
-            this.ctx.moveTo(legendX, legendY);
-            this.ctx.lineTo(legendX + 20, legendY);
-            this.ctx.stroke();
+            this.ctx.arc(legendX + 6, legendY, 5, 0, 2 * Math.PI);
+            this.ctx.fill();
 
             // Draw label
             this.ctx.fillStyle = COLORS.text;
             this.ctx.textAlign = 'left';
-            const labelText = s.name;
-            this.ctx.fillText(labelText, legendX + 25, legendY);
+            this.ctx.fillText(s.name, legendX + 14, legendY);
 
             // Move to next legend item
-            const textWidth = this.ctx.measureText(labelText).width;
-            legendX += 25 + textWidth + 20;
+            const textWidth = this.ctx.measureText(s.name).width;
+            legendX += 12 + 6 + textWidth + 20;
         });
     }
 
