@@ -695,10 +695,10 @@ class SimpleChart {
         this.animate((progress) => {
             // Draw horizontal grid lines first (behind everything)
             const numGridLines = 5;
-            this.ctx.strokeStyle = '#D0D0D0';
+            this.ctx.strokeStyle = '#F0F2F2';
             this.ctx.lineWidth = 1;
             this.ctx.fillStyle = COLORS.text;
-            this.ctx.font = '11px Proxima Nova, Arial';
+            this.ctx.font = '12px Proxima Nova, Arial';
 
             for (let i = 0; i <= numGridLines; i++) {
                 const y = adjustedPadding.top + (chartHeight / numGridLines) * i;
@@ -732,7 +732,7 @@ class SimpleChart {
                 const data = s.data;
                 const color = s.color;
 
-                // Draw line with smooth curves
+                // Draw continuous line connecting all valid points
                 this.ctx.strokeStyle = color;
                 this.ctx.lineWidth = 2.5;
                 this.ctx.lineCap = 'round';
@@ -746,7 +746,7 @@ class SimpleChart {
 
                     const value = data[index];
                     if (value === null || value === undefined) {
-                        started = false;
+                        // Skip null values but don't break the line
                         continue;
                     }
 
@@ -757,28 +757,36 @@ class SimpleChart {
                         this.ctx.moveTo(x, y);
                         started = true;
                     } else {
-                        // Straight line segments
+                        // Straight line segments - continuous connection
                         this.ctx.lineTo(x, y);
                     }
                 }
                 this.ctx.stroke();
             });
 
-            // Draw x-axis labels (show every nth label to avoid overlap)
-            const labelStep = Math.ceil(labels.length / 8);
+            // Draw x-axis labels with even spacing
+            const maxLabels = 12;
+            const totalLabels = labels.length;
+            const labelStep = Math.max(1, Math.floor((totalLabels - 1) / (maxLabels - 1)));
+
             this.ctx.fillStyle = COLORS.text;
-            this.ctx.font = '10px Proxima Nova, Arial';
+            this.ctx.font = '11px Proxima Nova, Arial';
             this.ctx.textAlign = 'center';
-            labels.forEach((label, index) => {
-                if (index % labelStep === 0 || index === labels.length - 1) {
-                    const x = adjustedPadding.left + index * pointSpacing;
-                    const y = this.height - adjustedPadding.bottom + 15;
-                    this.ctx.save();
-                    this.ctx.translate(x, y);
-                    this.ctx.rotate(-Math.PI / 6);
-                    this.ctx.fillText(label, 0, 0);
-                    this.ctx.restore();
-                }
+
+            // Calculate which indices to show for even distribution
+            const indicesToShow = [];
+            for (let i = 0; i < maxLabels && i * labelStep < totalLabels; i++) {
+                indicesToShow.push(i * labelStep);
+            }
+            // Always include the last label
+            if (indicesToShow[indicesToShow.length - 1] !== totalLabels - 1) {
+                indicesToShow.push(totalLabels - 1);
+            }
+
+            indicesToShow.forEach((index) => {
+                const x = adjustedPadding.left + index * pointSpacing;
+                const y = this.height - adjustedPadding.bottom + 18;
+                this.ctx.fillText(labels[index], x, y);
             });
 
             // Draw legend at bottom (always visible during animation)
