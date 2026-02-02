@@ -576,6 +576,196 @@ class SimpleChart {
         });
     }
 
+    drawMultiLineChart(series, labels) {
+        // Filter out series with no valid data
+        const validSeries = series.filter(s => s.data.some(v => v !== null && v !== undefined));
+
+        if (!validSeries.length || !labels || labels.length === 0) {
+            this.clear();
+            this.drawNoData();
+            return;
+        }
+
+        // Calculate legend dimensions - position at top
+        const legendHeight = 25;
+        const adjustedPadding = {
+            ...this.padding,
+            top: this.padding.top + legendHeight
+        };
+
+        const chartWidth = this.width - adjustedPadding.left - adjustedPadding.right;
+        const chartHeight = this.height - adjustedPadding.top - adjustedPadding.bottom;
+
+        // Find global min/max across all series
+        let globalMax = -Infinity;
+        let globalMin = Infinity;
+        validSeries.forEach(s => {
+            s.data.forEach(v => {
+                if (v !== null && v !== undefined) {
+                    globalMax = Math.max(globalMax, v);
+                    globalMin = Math.min(globalMin, v);
+                }
+            });
+        });
+
+        if (globalMin === Infinity) globalMin = 0;
+        if (globalMax === -Infinity) globalMax = 1;
+        const valueRange = globalMax - globalMin || 1;
+
+        const pointSpacing = chartWidth / (labels.length - 1 || 1);
+
+        // Store metadata for hover detection
+        this.chartMetadata = {
+            type: 'multiline',
+            series: validSeries,
+            labels: labels,
+            minValue: globalMin,
+            maxValue: globalMax,
+            valueRange: valueRange
+        };
+
+        this.animate((progress) => {
+            // Draw axes
+            this.ctx.strokeStyle = COLORS.grid;
+            this.ctx.lineWidth = 1;
+            this.ctx.beginPath();
+            this.ctx.moveTo(adjustedPadding.left, adjustedPadding.top);
+            this.ctx.lineTo(adjustedPadding.left, this.height - adjustedPadding.bottom);
+            this.ctx.lineTo(this.width - adjustedPadding.right, this.height - adjustedPadding.bottom);
+            this.ctx.stroke();
+
+            // Draw horizontal grid lines
+            const numGridLines = 5;
+            this.ctx.strokeStyle = '#F0F2F2';
+            this.ctx.fillStyle = COLORS.text;
+            this.ctx.font = '12px Proxima Nova, Arial';
+            for (let i = 0; i <= numGridLines; i++) {
+                const y = adjustedPadding.top + (chartHeight / numGridLines) * i;
+                const value = globalMax - (valueRange / numGridLines) * i;
+                this.ctx.beginPath();
+                this.ctx.moveTo(adjustedPadding.left, y);
+                this.ctx.lineTo(this.width - adjustedPadding.right, y);
+                this.ctx.stroke();
+                this.ctx.textAlign = 'right';
+                this.ctx.fillText(formatPrice(value), adjustedPadding.left - 8, y + 4);
+                this.ctx.textAlign = 'left';
+            }
+
+            // Draw each series
+            validSeries.forEach((s, seriesIndex) => {
+                const data = s.data;
+                const color = s.color;
+
+                // Calculate how many points to draw based on animation progress
+                const pointsToDraw = Math.floor(data.length * progress);
+
+                // Draw line
+                this.ctx.strokeStyle = color;
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+
+                let started = false;
+                for (let index = 0; index <= pointsToDraw; index++) {
+                    if (index >= data.length) break;
+
+                    const value = data[index];
+                    if (value === null || value === undefined) continue;
+
+                    const x = adjustedPadding.left + index * pointSpacing;
+                    const y = adjustedPadding.top + chartHeight - ((value - globalMin) / valueRange) * chartHeight;
+
+                    if (!started) {
+                        this.ctx.moveTo(x, y);
+                        started = true;
+                    } else {
+                        this.ctx.lineTo(x, y);
+                    }
+                }
+                this.ctx.stroke();
+
+                // Draw points
+                for (let index = 0; index <= pointsToDraw; index++) {
+                    if (index >= data.length) break;
+
+                    const value = data[index];
+                    if (value === null || value === undefined) continue;
+
+                    const x = adjustedPadding.left + index * pointSpacing;
+                    const y = adjustedPadding.top + chartHeight - ((value - globalMin) / valueRange) * chartHeight;
+
+                    // Animate point appearance
+                    const pointProgress = Math.min((progress * data.length - index) * 2, 1);
+                    if (pointProgress > 0) {
+                        this.ctx.fillStyle = color;
+                        this.ctx.beginPath();
+                        this.ctx.arc(x, y, 3 * pointProgress, 0, 2 * Math.PI);
+                        this.ctx.fill();
+
+                        // Add to data points for tooltip
+                        if (progress === 1) {
+                            this.dataPoints.push({
+                                x: x,
+                                y: y,
+                                radius: 15,
+                                label: `${s.name} - ${labels[index]}: ${formatPrice(value)}`
+                            });
+                        }
+                    }
+                }
+            });
+
+            // Draw labels (show every nth label to avoid overlap)
+            const labelStep = Math.ceil(labels.length / 10);
+            this.ctx.fillStyle = COLORS.text;
+            this.ctx.font = '11px Proxima Nova, Arial';
+            this.ctx.textAlign = 'center';
+            labels.forEach((label, index) => {
+                if (index % labelStep === 0 || index === labels.length - 1) {
+                    const x = adjustedPadding.left + index * pointSpacing;
+                    const y = this.height - adjustedPadding.bottom + 20;
+                    this.ctx.save();
+                    this.ctx.translate(x, y);
+                    this.ctx.rotate(-Math.PI / 4);
+                    this.ctx.fillText(label, 0, 0);
+                    this.ctx.restore();
+                }
+            });
+
+            // Draw legend at top (after animation completes for cleaner look)
+            if (progress === 1) {
+                this.drawMultiLineLegend(validSeries);
+            }
+        });
+    }
+
+    drawMultiLineLegend(series) {
+        const legendY = this.padding.top - 5;
+        let legendX = this.padding.left;
+
+        this.ctx.font = '11px Proxima Nova, Arial';
+        this.ctx.textBaseline = 'middle';
+
+        series.forEach((s, index) => {
+            // Draw colored line segment
+            this.ctx.strokeStyle = s.color;
+            this.ctx.lineWidth = 3;
+            this.ctx.beginPath();
+            this.ctx.moveTo(legendX, legendY);
+            this.ctx.lineTo(legendX + 20, legendY);
+            this.ctx.stroke();
+
+            // Draw label
+            this.ctx.fillStyle = COLORS.text;
+            this.ctx.textAlign = 'left';
+            const labelText = s.name;
+            this.ctx.fillText(labelText, legendX + 25, legendY);
+
+            // Move to next legend item
+            const textWidth = this.ctx.measureText(labelText).width;
+            legendX += 25 + textWidth + 20;
+        });
+    }
+
     drawNoData() {
         this.ctx.fillStyle = '#424647';
         this.ctx.font = '16px Proxima Nova, Arial';
@@ -1061,6 +1251,80 @@ function analyzePriceTrends(data) {
     };
 }
 
+// Analyze price trends over time by block size categories
+function analyzePriceTrendsByBlockSize(data) {
+    // Block size categories
+    const categories = {
+        '/25 to /22': { min: 22, max: 25, color: '#0062FF' },      // Primary blue
+        '/21 to /20': { min: 20, max: 21, color: '#00A86B' },      // Green
+        '/19 to /17': { min: 17, max: 19, color: '#FF6B35' },      // Orange
+        '/16+': { min: 1, max: 16, color: '#9B59B6' }              // Purple
+    };
+
+    // Group data by date and block size category
+    const dateGroupsByCategory = {};
+
+    // Initialize categories
+    Object.keys(categories).forEach(cat => {
+        dateGroupsByCategory[cat] = {};
+    });
+
+    data.forEach(item => {
+        if (!item.date || !item.block) return;
+
+        const date = item.date.split('T')[0];
+        const blockSize = parseInt(item.block);
+        const price = parsePrice(item);
+
+        if (isNaN(blockSize) || price <= 0) return;
+
+        // Determine which category this block belongs to
+        for (const [catName, catInfo] of Object.entries(categories)) {
+            if (blockSize >= catInfo.min && blockSize <= catInfo.max) {
+                if (!dateGroupsByCategory[catName][date]) {
+                    dateGroupsByCategory[catName][date] = [];
+                }
+                dateGroupsByCategory[catName][date].push(price);
+                break;
+            }
+        }
+    });
+
+    // Get all unique dates across all categories
+    const allDates = new Set();
+    Object.values(dateGroupsByCategory).forEach(dateGroups => {
+        Object.keys(dateGroups).forEach(date => allDates.add(date));
+    });
+
+    const sortedDates = Array.from(allDates).sort();
+
+    // Format dates for display
+    const formattedDates = sortedDates.map(date => {
+        const d = new Date(date);
+        return `${d.getMonth() + 1}/${d.getDate()}`;
+    });
+
+    // Calculate average price per date for each category
+    const series = Object.entries(categories).map(([catName, catInfo]) => {
+        const avgPrices = sortedDates.map(date => {
+            const prices = dateGroupsByCategory[catName][date];
+            if (!prices || prices.length === 0) return null;
+            return prices.reduce((a, b) => a + b, 0) / prices.length;
+        });
+
+        return {
+            name: catName,
+            data: avgPrices,
+            color: catInfo.color
+        };
+    });
+
+    return {
+        labels: formattedDates,
+        series: series
+    };
+}
+
 // Render charts based on active view
 function renderCharts() {
     const priorSalesActive = document.getElementById('priorSalesSection').classList.contains('active');
@@ -1071,7 +1335,7 @@ function renderCharts() {
         const salesRirData = analyzeByRir(filteredSalesData);
         const salesBlockData = analyzeByBlockSize(filteredSalesData);
         const salesPriceByBlockData = analyzeAvgPriceByBlockSize(filteredSalesData);
-        const salesTrendData = analyzePriceTrends(filteredSalesData);
+        const salesTrendData = analyzePriceTrendsByBlockSize(filteredSalesData);
 
         new SimpleChart('salesByRirChart').drawPieChart(
             salesRirData.data,
@@ -1093,8 +1357,8 @@ function renderCharts() {
             true  // Price chart
         );
 
-        new SimpleChart('salesTrendChart').drawLineChart(
-            salesTrendData.data,
+        new SimpleChart('salesTrendChart').drawMultiLineChart(
+            salesTrendData.series,
             salesTrendData.labels
         );
     }
