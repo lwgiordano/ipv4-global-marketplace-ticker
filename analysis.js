@@ -203,6 +203,65 @@ class SimpleChart {
             }
         }
 
+        // For multiline charts - find closest point across all series
+        if (this.chartMetadata && this.chartMetadata.type === 'multiline') {
+            const meta = this.chartMetadata;
+
+            // Use actual rendered canvas dimensions
+            const actualWidth = rect.width;
+            const actualHeight = rect.height;
+
+            // Recalculate chart dimensions based on actual size
+            const scaleX = actualWidth / this.width;
+            const scaleY = actualHeight / this.height;
+
+            const ap = meta.adjustedPadding;
+            const actualChartLeft = ap.left * scaleX;
+            const actualChartTop = ap.top * scaleY;
+            const actualChartRight = actualWidth - ap.right * scaleX;
+            const actualChartBottom = (this.height - ap.bottom) * scaleY;
+            const actualChartWidth = actualChartRight - actualChartLeft;
+            const actualChartHeight = actualChartBottom - actualChartTop;
+
+            // Check if mouse is within chart area
+            if (x < actualChartLeft || x > actualChartRight || y < actualChartTop || y > actualChartBottom) {
+                this.hideTooltip();
+                return;
+            }
+
+            const numPoints = meta.labels.length;
+            const actualPointSpacing = actualChartWidth / (numPoints - 1 || 1);
+
+            // Find closest point across all series
+            let closestPoint = null;
+            let closestDistance = Infinity;
+            let closestSeries = null;
+
+            meta.series.forEach(s => {
+                for (let i = 0; i < numPoints; i++) {
+                    const value = s.data[i];
+                    if (value === null || value === undefined) continue;
+
+                    const pointX = actualChartLeft + i * actualPointSpacing;
+                    const pointY = actualChartTop + actualChartHeight - ((value - meta.minValue) / meta.valueRange) * actualChartHeight;
+
+                    const distance = Math.sqrt(Math.pow(x - pointX, 2) + Math.pow(y - pointY, 2));
+                    if (distance < closestDistance) {
+                        closestDistance = distance;
+                        closestPoint = { index: i, x: pointX, y: pointY, value: value };
+                        closestSeries = s;
+                    }
+                }
+            });
+
+            // Show tooltip if close enough to a point
+            if (closestPoint && closestDistance < 25 && closestSeries) {
+                const label = `<strong>${closestSeries.name}</strong><br>${meta.labels[closestPoint.index]}: ${formatPrice(closestPoint.value)}`;
+                this.showTooltip({ label: label }, e.clientX, e.clientY);
+                return;
+            }
+        }
+
         // For pie charts - check stored data points
         for (const point of this.dataPoints) {
             if (point.x !== undefined && point.y !== undefined && point.radius !== undefined) {
@@ -573,6 +632,197 @@ class SimpleChart {
                     this.ctx.restore();
                 }
             });
+        });
+    }
+
+    drawMultiLineChart(series, labels) {
+        // Filter out series with no valid data
+        const validSeries = series.filter(s => s.data.some(v => v !== null && v !== undefined));
+
+        if (!validSeries.length || !labels || labels.length === 0) {
+            this.clear();
+            this.drawNoData();
+            return;
+        }
+
+        // Legend at bottom - allocate space (reduced to align with pie chart)
+        const legendHeight = 25;
+        const adjustedPadding = {
+            ...this.padding,
+            top: this.padding.top - 10,  // Move chart up to align with pie chart
+            bottom: this.padding.bottom + legendHeight
+        };
+
+        const chartWidth = this.width - adjustedPadding.left - adjustedPadding.right;
+        const chartHeight = this.height - adjustedPadding.top - adjustedPadding.bottom;
+
+        // Find global min/max across all series
+        let globalMax = -Infinity;
+        let globalMin = Infinity;
+        validSeries.forEach(s => {
+            s.data.forEach(v => {
+                if (v !== null && v !== undefined) {
+                    globalMax = Math.max(globalMax, v);
+                    globalMin = Math.min(globalMin, v);
+                }
+            });
+        });
+
+        if (globalMin === Infinity) globalMin = 0;
+        if (globalMax === -Infinity) globalMax = 1;
+
+        // Add 5% padding to top and bottom of range for better visual
+        const rangePadding = (globalMax - globalMin) * 0.05;
+        globalMin = Math.max(0, globalMin - rangePadding);
+        globalMax = globalMax + rangePadding;
+        const valueRange = globalMax - globalMin || 1;
+
+        const pointSpacing = chartWidth / (labels.length - 1 || 1);
+
+        // Store metadata for hover detection
+        this.chartMetadata = {
+            type: 'multiline',
+            series: validSeries,
+            labels: labels,
+            minValue: globalMin,
+            maxValue: globalMax,
+            valueRange: valueRange,
+            adjustedPadding: adjustedPadding,
+            chartWidth: chartWidth,
+            chartHeight: chartHeight,
+            pointSpacing: pointSpacing
+        };
+
+        this.animate((progress) => {
+            // Draw horizontal grid lines first (behind everything)
+            const numGridLines = 5;
+            this.ctx.strokeStyle = '#F0F2F2';
+            this.ctx.lineWidth = 1;
+            this.ctx.fillStyle = COLORS.text;
+            this.ctx.font = '12px Proxima Nova, Arial';
+
+            for (let i = 0; i <= numGridLines; i++) {
+                const y = adjustedPadding.top + (chartHeight / numGridLines) * i;
+                const value = globalMax - (valueRange / numGridLines) * i;
+
+                // Solid grid lines (light gray)
+                this.ctx.beginPath();
+                this.ctx.moveTo(adjustedPadding.left, y);
+                this.ctx.lineTo(this.width - adjustedPadding.right, y);
+                this.ctx.stroke();
+
+                // Y-axis labels
+                this.ctx.textAlign = 'right';
+                this.ctx.fillText(formatPrice(value), adjustedPadding.left - 10, y + 4);
+            }
+
+            // Draw axes
+            this.ctx.strokeStyle = COLORS.grid;
+            this.ctx.lineWidth = 1;
+            this.ctx.beginPath();
+            this.ctx.moveTo(adjustedPadding.left, adjustedPadding.top);
+            this.ctx.lineTo(adjustedPadding.left, this.height - adjustedPadding.bottom);
+            this.ctx.lineTo(this.width - adjustedPadding.right, this.height - adjustedPadding.bottom);
+            this.ctx.stroke();
+
+            // Calculate how many points to draw based on animation progress
+            const pointsToDraw = Math.floor(labels.length * progress);
+
+            // Draw each series
+            validSeries.forEach((s, seriesIndex) => {
+                const data = s.data;
+                const color = s.color;
+
+                // Draw continuous line connecting all valid points
+                this.ctx.strokeStyle = color;
+                this.ctx.lineWidth = 2.5;
+                this.ctx.lineCap = 'round';
+                this.ctx.lineJoin = 'round';
+                this.ctx.beginPath();
+
+                let started = false;
+
+                for (let index = 0; index <= pointsToDraw; index++) {
+                    if (index >= data.length) break;
+
+                    const value = data[index];
+                    if (value === null || value === undefined) {
+                        // Skip null values but don't break the line
+                        continue;
+                    }
+
+                    const x = adjustedPadding.left + index * pointSpacing;
+                    const y = adjustedPadding.top + chartHeight - ((value - globalMin) / valueRange) * chartHeight;
+
+                    if (!started) {
+                        this.ctx.moveTo(x, y);
+                        started = true;
+                    } else {
+                        // Straight line segments - continuous connection
+                        this.ctx.lineTo(x, y);
+                    }
+                }
+                this.ctx.stroke();
+            });
+
+            // Draw x-axis labels with truly even spacing
+            const maxLabels = Math.min(12, labels.length);
+            const totalLabels = labels.length;
+
+            this.ctx.fillStyle = COLORS.text;
+            this.ctx.font = '11px Proxima Nova, Arial';
+            this.ctx.textAlign = 'center';
+
+            // Calculate evenly spaced indices
+            for (let i = 0; i < maxLabels; i++) {
+                // Calculate the exact fractional position for even distribution
+                const fraction = maxLabels > 1 ? i / (maxLabels - 1) : 0;
+                const index = Math.round(fraction * (totalLabels - 1));
+                const x = adjustedPadding.left + index * pointSpacing;
+                const y = this.height - adjustedPadding.bottom + 18;
+                this.ctx.fillText(labels[index], x, y);
+            }
+
+            // Draw legend at bottom (always visible during animation)
+            this.drawMultiLineLegend(validSeries, adjustedPadding);
+        });
+    }
+
+    drawMultiLineLegend(series, adjustedPadding) {
+        const legendY = this.height - 24;  // Aligned with pie chart legend position
+
+        // Calculate total legend width to center it
+        this.ctx.font = '11px Proxima Nova, Arial';
+        let totalWidth = 0;
+        const lineWidth = 20;
+        const spacing = 8;
+        series.forEach((s, index) => {
+            totalWidth += lineWidth + spacing + this.ctx.measureText(s.name).width;
+            if (index < series.length - 1) totalWidth += 24; // spacing between items
+        });
+
+        let legendX = (this.width - totalWidth) / 2;
+
+        this.ctx.textBaseline = 'middle';
+
+        series.forEach((s, index) => {
+            // Draw colored line segment (matching the reference aesthetic)
+            this.ctx.strokeStyle = s.color;
+            this.ctx.lineWidth = 2.5;
+            this.ctx.lineCap = 'round';
+            this.ctx.beginPath();
+            this.ctx.moveTo(legendX, legendY);
+            this.ctx.lineTo(legendX + lineWidth, legendY);
+            this.ctx.stroke();
+
+            // Draw label
+            this.ctx.fillStyle = COLORS.text;
+            this.ctx.textAlign = 'left';
+            this.ctx.fillText(s.name, legendX + lineWidth + spacing, legendY);
+
+            // Move to next legend item
+            const textWidth = this.ctx.measureText(s.name).width;
+            legendX += lineWidth + spacing + textWidth + 24;
         });
     }
 
@@ -1061,6 +1311,80 @@ function analyzePriceTrends(data) {
     };
 }
 
+// Analyze price trends over time by block size categories
+function analyzePriceTrendsByBlockSize(data) {
+    // Block size categories - ordered from largest to smallest blocks
+    const categories = {
+        '/16': { min: 1, max: 16, color: '#4472C4' },              // Steel blue
+        '/17 - /19': { min: 17, max: 19, color: '#ED7D31' },       // Orange
+        '/20 - /21': { min: 20, max: 21, color: '#A5A5A5' },       // Gray
+        '/22 - /24': { min: 22, max: 24, color: '#FFC000' }        // Yellow/Gold
+    };
+
+    // Group data by date and block size category
+    const dateGroupsByCategory = {};
+
+    // Initialize categories
+    Object.keys(categories).forEach(cat => {
+        dateGroupsByCategory[cat] = {};
+    });
+
+    data.forEach(item => {
+        if (!item.date || !item.block) return;
+
+        const date = item.date.split('T')[0];
+        const blockSize = parseInt(item.block);
+        const price = parsePrice(item);
+
+        if (isNaN(blockSize) || price <= 0) return;
+
+        // Determine which category this block belongs to
+        for (const [catName, catInfo] of Object.entries(categories)) {
+            if (blockSize >= catInfo.min && blockSize <= catInfo.max) {
+                if (!dateGroupsByCategory[catName][date]) {
+                    dateGroupsByCategory[catName][date] = [];
+                }
+                dateGroupsByCategory[catName][date].push(price);
+                break;
+            }
+        }
+    });
+
+    // Get all unique dates across all categories
+    const allDates = new Set();
+    Object.values(dateGroupsByCategory).forEach(dateGroups => {
+        Object.keys(dateGroups).forEach(date => allDates.add(date));
+    });
+
+    const sortedDates = Array.from(allDates).sort();
+
+    // Format dates for display
+    const formattedDates = sortedDates.map(date => {
+        const d = new Date(date);
+        return `${d.getMonth() + 1}/${d.getDate()}`;
+    });
+
+    // Calculate average price per date for each category
+    const series = Object.entries(categories).map(([catName, catInfo]) => {
+        const avgPrices = sortedDates.map(date => {
+            const prices = dateGroupsByCategory[catName][date];
+            if (!prices || prices.length === 0) return null;
+            return prices.reduce((a, b) => a + b, 0) / prices.length;
+        });
+
+        return {
+            name: catName,
+            data: avgPrices,
+            color: catInfo.color
+        };
+    });
+
+    return {
+        labels: formattedDates,
+        series: series
+    };
+}
+
 // Render charts based on active view
 function renderCharts() {
     const priorSalesActive = document.getElementById('priorSalesSection').classList.contains('active');
@@ -1071,7 +1395,7 @@ function renderCharts() {
         const salesRirData = analyzeByRir(filteredSalesData);
         const salesBlockData = analyzeByBlockSize(filteredSalesData);
         const salesPriceByBlockData = analyzeAvgPriceByBlockSize(filteredSalesData);
-        const salesTrendData = analyzePriceTrends(filteredSalesData);
+        const salesTrendData = analyzePriceTrendsByBlockSize(filteredSalesData);
 
         new SimpleChart('salesByRirChart').drawPieChart(
             salesRirData.data,
@@ -1093,8 +1417,8 @@ function renderCharts() {
             true  // Price chart
         );
 
-        new SimpleChart('salesTrendChart').drawLineChart(
-            salesTrendData.data,
+        new SimpleChart('salesTrendChart').drawMultiLineChart(
+            salesTrendData.series,
             salesTrendData.labels
         );
     }
