@@ -695,7 +695,7 @@ class SimpleChart {
         this.animate((progress) => {
             // Draw horizontal grid lines first (behind everything)
             const numGridLines = 5;
-            this.ctx.strokeStyle = '#E8EAEB';
+            this.ctx.strokeStyle = '#D0D0D0';
             this.ctx.lineWidth = 1;
             this.ctx.fillStyle = COLORS.text;
             this.ctx.font = '11px Proxima Nova, Arial';
@@ -704,13 +704,11 @@ class SimpleChart {
                 const y = adjustedPadding.top + (chartHeight / numGridLines) * i;
                 const value = globalMax - (valueRange / numGridLines) * i;
 
-                // Dashed grid lines
-                this.ctx.setLineDash([4, 4]);
+                // Solid grid lines (light gray)
                 this.ctx.beginPath();
                 this.ctx.moveTo(adjustedPadding.left, y);
                 this.ctx.lineTo(this.width - adjustedPadding.right, y);
                 this.ctx.stroke();
-                this.ctx.setLineDash([]);
 
                 // Y-axis labels
                 this.ctx.textAlign = 'right';
@@ -742,59 +740,28 @@ class SimpleChart {
                 this.ctx.beginPath();
 
                 let started = false;
-                let prevPoint = null;
 
                 for (let index = 0; index <= pointsToDraw; index++) {
                     if (index >= data.length) break;
 
                     const value = data[index];
                     if (value === null || value === undefined) {
-                        prevPoint = null;
+                        started = false;
                         continue;
                     }
 
                     const x = adjustedPadding.left + index * pointSpacing;
                     const y = adjustedPadding.top + chartHeight - ((value - globalMin) / valueRange) * chartHeight;
 
-                    if (!started || prevPoint === null) {
+                    if (!started) {
                         this.ctx.moveTo(x, y);
                         started = true;
                     } else {
-                        // Smooth curve using quadratic bezier
-                        const cpX = (prevPoint.x + x) / 2;
-                        this.ctx.quadraticCurveTo(prevPoint.x, prevPoint.y, cpX, (prevPoint.y + y) / 2);
-                        this.ctx.quadraticCurveTo(cpX, (prevPoint.y + y) / 2, x, y);
+                        // Straight line segments
+                        this.ctx.lineTo(x, y);
                     }
-                    prevPoint = { x, y };
                 }
                 this.ctx.stroke();
-
-                // Draw points (smaller, cleaner dots)
-                for (let index = 0; index <= pointsToDraw; index++) {
-                    if (index >= data.length) break;
-
-                    const value = data[index];
-                    if (value === null || value === undefined) continue;
-
-                    const x = adjustedPadding.left + index * pointSpacing;
-                    const y = adjustedPadding.top + chartHeight - ((value - globalMin) / valueRange) * chartHeight;
-
-                    // Animate point appearance
-                    const pointProgress = Math.min((progress * data.length - index) * 3, 1);
-                    if (pointProgress > 0) {
-                        // White border around point
-                        this.ctx.fillStyle = '#FFFFFF';
-                        this.ctx.beginPath();
-                        this.ctx.arc(x, y, 4 * pointProgress, 0, 2 * Math.PI);
-                        this.ctx.fill();
-
-                        // Colored center
-                        this.ctx.fillStyle = color;
-                        this.ctx.beginPath();
-                        this.ctx.arc(x, y, 3 * pointProgress, 0, 2 * Math.PI);
-                        this.ctx.fill();
-                    }
-                }
             });
 
             // Draw x-axis labels (show every nth label to avoid overlap)
@@ -825,9 +792,11 @@ class SimpleChart {
         // Calculate total legend width to center it
         this.ctx.font = '11px Proxima Nova, Arial';
         let totalWidth = 0;
+        const lineWidth = 20;
+        const spacing = 8;
         series.forEach((s, index) => {
-            totalWidth += 12 + 6 + this.ctx.measureText(s.name).width;
-            if (index < series.length - 1) totalWidth += 20; // spacing between items
+            totalWidth += lineWidth + spacing + this.ctx.measureText(s.name).width;
+            if (index < series.length - 1) totalWidth += 24; // spacing between items
         });
 
         let legendX = (this.width - totalWidth) / 2;
@@ -835,20 +804,23 @@ class SimpleChart {
         this.ctx.textBaseline = 'middle';
 
         series.forEach((s, index) => {
-            // Draw colored circle
-            this.ctx.fillStyle = s.color;
+            // Draw colored line segment (matching the reference aesthetic)
+            this.ctx.strokeStyle = s.color;
+            this.ctx.lineWidth = 2.5;
+            this.ctx.lineCap = 'round';
             this.ctx.beginPath();
-            this.ctx.arc(legendX + 6, legendY, 5, 0, 2 * Math.PI);
-            this.ctx.fill();
+            this.ctx.moveTo(legendX, legendY);
+            this.ctx.lineTo(legendX + lineWidth, legendY);
+            this.ctx.stroke();
 
             // Draw label
             this.ctx.fillStyle = COLORS.text;
             this.ctx.textAlign = 'left';
-            this.ctx.fillText(s.name, legendX + 14, legendY);
+            this.ctx.fillText(s.name, legendX + lineWidth + spacing, legendY);
 
             // Move to next legend item
             const textWidth = this.ctx.measureText(s.name).width;
-            legendX += 12 + 6 + textWidth + 20;
+            legendX += lineWidth + spacing + textWidth + 24;
         });
     }
 
@@ -1339,12 +1311,12 @@ function analyzePriceTrends(data) {
 
 // Analyze price trends over time by block size categories
 function analyzePriceTrendsByBlockSize(data) {
-    // Block size categories
+    // Block size categories - ordered from largest to smallest blocks
     const categories = {
-        '/25 to /22': { min: 22, max: 25, color: '#0062FF' },      // Primary blue
-        '/21 to /20': { min: 20, max: 21, color: '#00A86B' },      // Green
-        '/19 to /17': { min: 17, max: 19, color: '#FF6B35' },      // Orange
-        '/16+': { min: 1, max: 16, color: '#9B59B6' }              // Purple
+        '/16': { min: 1, max: 16, color: '#4472C4' },              // Steel blue
+        '/17 - /19': { min: 17, max: 19, color: '#ED7D31' },       // Orange
+        '/20 - /21': { min: 20, max: 21, color: '#A5A5A5' },       // Gray
+        '/22 - /24': { min: 22, max: 24, color: '#FFC000' }        // Yellow/Gold
     };
 
     // Group data by date and block size category
