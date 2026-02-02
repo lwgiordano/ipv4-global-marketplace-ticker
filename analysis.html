@@ -336,6 +336,9 @@
             animation: fadeInUp 0.6s ease-out forwards;
             box-shadow: 0 1px 3px rgba(0,0,0,0.06);
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         .chart-container:hover {
             transform: translateY(-4px);
@@ -356,8 +359,15 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
-        .pie-chart-container .chart-title {
-            margin-bottom: 0;
+        .chart-description {
+            text-align: center;
+            font-size: 12px;
+            color: #6B7280;
+            margin-bottom: 16px;
+            line-height: 1.4;
+            width: 100%;
+            padding: 0 5%;
+            box-sizing: border-box;
         }
         canvas {
             display: block;
@@ -740,7 +750,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <img src="https://www.ipv4.global/wp-content/uploads/2025/12/IPv4-Logo-Light-BG.svg" alt="IPv4.Global" style="height: 40px;">
+            <a href="https://ipv4.global" target="_blank"><img src="https://www.ipv4.global/wp-content/uploads/2025/12/IPv4-Logo-Light-BG.svg" alt="IPv4.Global" style="height: 40px;"></a>
             <a href="https://auctions.ipv4.global/" target="_blank" class="marketplace-link">Visit Marketplace</a>
         </div>
 
@@ -850,18 +860,22 @@
             <div class="charts-grid">
                 <div class="chart-container">
                     <div class="chart-title">Price Trends Over Time (per IP)</div>
+                    <div class="chart-description">Historical price per IP address over the selected time period, showing market trends and price fluctuations.</div>
                     <canvas id="salesTrendChart"></canvas>
                 </div>
                 <div class="chart-container pie-chart-container">
                     <div class="chart-title">Sales Volume by RIR</div>
+                    <div class="chart-description">Distribution of completed sales across Regional Internet Registries (ARIN, RIPE, APNIC, etc.).</div>
                     <canvas id="salesByRirChart"></canvas>
                 </div>
                 <div class="chart-container">
                     <div class="chart-title">Sales Volume by Block Size</div>
+                    <div class="chart-description">Number of IPv4 blocks sold grouped by CIDR block size (e.g., /24, /23, /22).</div>
                     <canvas id="salesByBlockChart"></canvas>
                 </div>
                 <div class="chart-container">
                     <div class="chart-title">Average Price by Block Size (per IP)</div>
+                    <div class="chart-description">Average sale price per individual IP address, broken down by block size.</div>
                     <canvas id="salesPriceByBlockChart"></canvas>
                 </div>
             </div>
@@ -891,18 +905,22 @@
             <div class="charts-grid">
                 <div class="chart-container">
                     <div class="chart-title">Asking Prices by Block Size (per IP)</div>
+                    <div class="chart-description">Current asking prices per IP address for active listings, grouped by CIDR block size.</div>
                     <canvas id="listingsPriceByBlockChart"></canvas>
                 </div>
                 <div class="chart-container pie-chart-container">
                     <div class="chart-title">Available Inventory by RIR</div>
+                    <div class="chart-description">Distribution of currently available IPv4 blocks across Regional Internet Registries.</div>
                     <canvas id="listingsByRirChart"></canvas>
                 </div>
                 <div class="chart-container">
                     <div class="chart-title">Available Inventory by Block Size</div>
+                    <div class="chart-description">Number of IPv4 blocks currently for sale, grouped by CIDR block size.</div>
                     <canvas id="listingsByBlockChart"></canvas>
                 </div>
                 <div class="chart-container">
                     <div class="chart-title">Price Comparison by RIR (per IP)</div>
+                    <div class="chart-description">Average asking price per IP address across different Regional Internet Registries.</div>
                     <canvas id="listingsPriceByRirChart"></canvas>
                 </div>
             </div>
