@@ -645,10 +645,11 @@ class SimpleChart {
             return;
         }
 
-        // Legend at bottom - allocate space
-        const legendHeight = 35;
+        // Legend at bottom - allocate space (reduced to align with pie chart)
+        const legendHeight = 25;
         const adjustedPadding = {
             ...this.padding,
+            top: this.padding.top - 10,  // Move chart up to align with pie chart
             bottom: this.padding.bottom + legendHeight
         };
 
@@ -764,30 +765,23 @@ class SimpleChart {
                 this.ctx.stroke();
             });
 
-            // Draw x-axis labels with even spacing
-            const maxLabels = 12;
+            // Draw x-axis labels with truly even spacing
+            const maxLabels = Math.min(12, labels.length);
             const totalLabels = labels.length;
-            const labelStep = Math.max(1, Math.floor((totalLabels - 1) / (maxLabels - 1)));
 
             this.ctx.fillStyle = COLORS.text;
             this.ctx.font = '11px Proxima Nova, Arial';
             this.ctx.textAlign = 'center';
 
-            // Calculate which indices to show for even distribution
-            const indicesToShow = [];
-            for (let i = 0; i < maxLabels && i * labelStep < totalLabels; i++) {
-                indicesToShow.push(i * labelStep);
-            }
-            // Always include the last label
-            if (indicesToShow[indicesToShow.length - 1] !== totalLabels - 1) {
-                indicesToShow.push(totalLabels - 1);
-            }
-
-            indicesToShow.forEach((index) => {
+            // Calculate evenly spaced indices
+            for (let i = 0; i < maxLabels; i++) {
+                // Calculate the exact fractional position for even distribution
+                const fraction = maxLabels > 1 ? i / (maxLabels - 1) : 0;
+                const index = Math.round(fraction * (totalLabels - 1));
                 const x = adjustedPadding.left + index * pointSpacing;
                 const y = this.height - adjustedPadding.bottom + 18;
                 this.ctx.fillText(labels[index], x, y);
-            });
+            }
 
             // Draw legend at bottom (always visible during animation)
             this.drawMultiLineLegend(validSeries, adjustedPadding);
@@ -795,7 +789,7 @@ class SimpleChart {
     }
 
     drawMultiLineLegend(series, adjustedPadding) {
-        const legendY = this.height - 18;
+        const legendY = this.height - 24;  // Aligned with pie chart legend position
 
         // Calculate total legend width to center it
         this.ctx.font = '11px Proxima Nova, Arial';
